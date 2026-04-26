@@ -24,6 +24,11 @@ import {
   useEditor,
   useValue,
 } from "tldraw";
+import {
+  GENERATION_PLACEHOLDER_TYPE,
+  GenerationPlaceholderShapeUtil,
+  type GenerationPlaceholderShape,
+} from "@/components/generation-placeholder-shape";
 import type { ApiSceneResponse, ImageProvider } from "@/lib/types";
 
 const PROVIDER_STORAGE_KEY = "casa.imageProvider";
@@ -32,6 +37,12 @@ const PROVIDER_LABELS: Record<ImageProvider, string> = {
   openai: "OpenAI",
   gemini: "Gemini",
 };
+
+const PLACEHOLDER_W = 480;
+const PLACEHOLDER_H = 320;
+const PLACEHOLDER_OFFSET_STEP = 36;
+
+const customShapeUtils = [GenerationPlaceholderShapeUtil];
 
 type AddImageOptions = {
   point?: VecLike;
@@ -82,40 +93,61 @@ function isTextShape(shape: TLShape): shape is TLTextShape {
   return shape.type === "text";
 }
 
+function isPlaceholderShape(
+  shape: TLShape | undefined | null,
+): shape is GenerationPlaceholderShape {
+  return Boolean(shape && shape.type === GENERATION_PLACEHOLDER_TYPE);
+}
+
 function getRole(shape: TLShape): "base" | undefined {
   const role = (shape.meta as { role?: string } | undefined)?.role;
   return role === "base" ? "base" : undefined;
 }
 
-function findBaseImage(editor: Editor): TLImageShape | null {
-  return (
-    editor
-      .getCurrentPageShapes()
-      .filter(isImageShape)
-      .find((shape) => getRole(shape) === "base") ?? null
-  );
+function findBaseImages(editor: Editor): TLImageShape[] {
+  return editor
+    .getCurrentPageShapes()
+    .filter(isImageShape)
+    .filter((shape) => getRole(shape) === "base");
 }
 
-function setBaseImage(editor: Editor, nextBaseId: TLShapeId | null) {
-  const allImages = editor.getCurrentPageShapes().filter(isImageShape);
-  const updates = allImages
-    .filter((shape) => getRole(shape) === "base" || shape.id === nextBaseId)
-    .map((shape) => {
-      const meta = (shape.meta ?? {}) as Record<string, unknown>;
-      const { role: _ignored, ...rest } = meta as { role?: unknown };
-      return {
-        id: shape.id,
-        type: "image" as const,
-        meta:
-          shape.id === nextBaseId
-            ? { ...rest, role: "base" as const }
-            : rest,
-      };
-    });
+function getSelectedImages(editor: Editor): TLImageShape[] {
+  return editor.getSelectedShapes().filter(isImageShape);
+}
 
-  if (updates.length > 0) {
-    editor.updateShapes(updates);
-  }
+type SelectionBaseState = "none" | "all-base" | "none-base" | "mixed";
+
+function describeSelectionBaseState(images: TLImageShape[]): SelectionBaseState {
+  if (images.length === 0) return "none";
+  const baseCount = images.filter((s) => getRole(s) === "base").length;
+  if (baseCount === 0) return "none-base";
+  if (baseCount === images.length) return "all-base";
+  return "mixed";
+}
+
+/**
+ * Toggle base role on the given image shapes.
+ * - If every shape is already a base, all are unmarked.
+ * - Otherwise, every shape is marked as base.
+ * Multiple bases can coexist (one per generation cluster).
+ */
+function toggleBaseRole(editor: Editor, ids: TLShapeId[]) {
+  const shapes = ids
+    .map((id) => editor.getShape(id))
+    .filter((shape): shape is TLImageShape => isImageShape(shape));
+
+  if (shapes.length === 0) return;
+
+  const allBase = shapes.every((shape) => getRole(shape) === "base");
+  const targetIsBase = !allBase;
+
+  const updates = shapes.map((shape) => ({
+    id: shape.id,
+    type: "image" as const,
+    meta: { role: targetIsBase ? ("base" as const) : "" },
+  }));
+
+  editor.updateShapes(updates);
 }
 
 function richTextToPlainText(node: unknown): string {
@@ -139,8 +171,9 @@ type CollectedInput = {
 };
 
 type GenerationCollection = {
-  base: CollectedInput | null;
+  base: CollectedInput;
   inspirations: CollectedInput[];
+  baseShape: TLImageShape;
 };
 
 async function flattenImageWithAnnotations(
@@ -154,6 +187,7 @@ async function flattenImageWithAnnotations(
   const overlapping = allShapes.filter((shape) => {
     if (shape.id === imageShape.id) return false;
     if (isImageShape(shape)) return false;
+    if (isPlaceholderShape(shape)) return false;
 
     const bounds = editor.getShapePageBounds(shape);
     return bounds ? bounds.collides(imageBounds) : false;
@@ -176,18 +210,38 @@ async function flattenImageWithAnnotations(
   return { composite: result.blob, textHints };
 }
 
-async function collectGenerationInputs(editor: Editor): Promise<GenerationCollection> {
+type ClusterPickError =
+  | { kind: "no-base" }
+  | { kind: "many-bases"; count: number };
+
+function pickClusterFromSelection(
+  editor: Editor,
+):
+  | { ok: true; baseShape: TLImageShape; inspirationShapes: TLImageShape[] }
+  | { ok: false; error: ClusterPickError } {
+  const selected = getSelectedImages(editor);
+  const bases = selected.filter((shape) => getRole(shape) === "base");
+
+  if (bases.length === 0) {
+    return { ok: false, error: { kind: "no-base" } };
+  }
+  if (bases.length > 1) {
+    return { ok: false, error: { kind: "many-bases", count: bases.length } };
+  }
+
+  const baseShape = bases[0];
+  const inspirationShapes = selected.filter((shape) => shape.id !== baseShape.id);
+  return { ok: true, baseShape, inspirationShapes };
+}
+
+async function collectGenerationInputs(
+  editor: Editor,
+  baseShape: TLImageShape,
+  inspirationShapes: TLImageShape[],
+): Promise<GenerationCollection | null> {
   const allShapes = editor.getCurrentPageShapes();
-  const baseShape = findBaseImage(editor);
-  const selectedImages = editor.getSelectedShapes().filter(isImageShape);
-
-  const base = baseShape
-    ? await flattenImageWithAnnotations(editor, baseShape, allShapes)
-    : null;
-
-  const inspirationShapes = selectedImages.filter(
-    (shape) => shape.id !== baseShape?.id,
-  );
+  const base = await flattenImageWithAnnotations(editor, baseShape, allShapes);
+  if (!base) return null;
 
   const inspirations: CollectedInput[] = [];
   for (const shape of inspirationShapes) {
@@ -195,7 +249,7 @@ async function collectGenerationInputs(editor: Editor): Promise<GenerationCollec
     if (collected) inspirations.push(collected);
   }
 
-  return { base, inspirations };
+  return { base, inspirations, baseShape };
 }
 
 async function readSceneResponse(response: Response): Promise<ApiSceneResponse> {
@@ -208,6 +262,51 @@ async function readSceneResponse(response: Response): Promise<ApiSceneResponse> 
   return payload;
 }
 
+function computePlaceholderPoint(
+  editor: Editor,
+  baseShape: TLImageShape | null,
+  fanIndex: number,
+): VecLike {
+  const baseBounds = baseShape ? editor.getShapePageBounds(baseShape) : null;
+
+  if (baseBounds) {
+    return {
+      x: baseBounds.maxX + 48,
+      y: baseBounds.minY + fanIndex * PLACEHOLDER_OFFSET_STEP,
+    };
+  }
+
+  const viewport = editor.getViewportPageBounds();
+  return {
+    x: viewport.center.x - PLACEHOLDER_W / 2 + fanIndex * PLACEHOLDER_OFFSET_STEP,
+    y: viewport.center.y - PLACEHOLDER_H / 2 + fanIndex * PLACEHOLDER_OFFSET_STEP,
+  };
+}
+
+function countPlaceholdersNear(editor: Editor, baseShape: TLImageShape): number {
+  const bounds = editor.getShapePageBounds(baseShape);
+  if (!bounds) return 0;
+  const probe = {
+    minX: bounds.maxX,
+    minY: bounds.minY - 200,
+    maxX: bounds.maxX + 1000,
+    maxY: bounds.maxY + 200,
+  };
+  return editor
+    .getCurrentPageShapes()
+    .filter(isPlaceholderShape)
+    .filter((shape) => {
+      const b = editor.getShapePageBounds(shape);
+      if (!b) return false;
+      return (
+        b.minX < probe.maxX &&
+        b.maxX > probe.minX &&
+        b.minY < probe.maxY &&
+        b.maxY > probe.minY
+      );
+    }).length;
+}
+
 type DesignBoardProps = {
   onError?: (message: string | null) => void;
 };
@@ -215,12 +314,11 @@ type DesignBoardProps = {
 export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
   function DesignBoard({ onError }, ref) {
     const editorRef = useRef<Editor | null>(null);
+    const jobsRef = useRef<Map<TLShapeId, AbortController>>(new Map());
+    const directionRef = useRef("");
     const [isDraggingOver, setIsDraggingOver] = useState(false);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [statusMessage, setStatusMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [provider, setProviderState] = useState<ImageProvider>("openai");
-    const [direction, setDirection] = useState("");
 
     const setProvider = useCallback((next: ImageProvider) => {
       setProviderState(next);
@@ -244,6 +342,14 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
       }
     }, []);
 
+    useEffect(() => {
+      const jobs = jobsRef.current;
+      return () => {
+        jobs.forEach((controller) => controller.abort());
+        jobs.clear();
+      };
+    }, []);
+
     const reportError = useCallback(
       (message: string | null) => {
         setErrorMessage(message);
@@ -255,7 +361,7 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
     const addImageDataUrls = useCallback(
       async (
         items: Array<{ dataUrl: string; name: string }>,
-        options?: AddImageOptions,
+        options?: AddImageOptions & { replacePlaceholderId?: TLShapeId },
       ) => {
         const editor = editorRef.current;
 
@@ -263,17 +369,28 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
           throw new Error("Canvas is not ready yet.");
         }
 
+        const placeholderId = options?.replacePlaceholderId;
+        const placeholder = placeholderId
+          ? editor.getShape(placeholderId)
+          : null;
+        const placeholderBounds =
+          placeholder && isPlaceholderShape(placeholder)
+            ? editor.getShapePageBounds(placeholder)
+            : null;
+
         const basePoint =
-          options?.point ??
-          editor.getSelectionPageBounds()?.center ??
-          editor.getViewportPageBounds().center;
+          placeholderBounds
+            ? { x: placeholderBounds.minX, y: placeholderBounds.minY }
+            : options?.point ??
+              editor.getSelectionPageBounds()?.center ??
+              editor.getViewportPageBounds().center;
         const createdIds: TLImageShape["id"][] = [];
 
         for (const [index, item] of items.entries()) {
           const naturalSize = await getImageSize(item.dataUrl);
           const size = fitImageSize(naturalSize.width, naturalSize.height);
           const id = createShapeId() as TLImageShape["id"];
-          const offset = index * 32;
+          const offset = placeholderBounds ? 0 : index * 32;
           const assetId: TLAssetId = AssetRecordType.createId();
 
           editor.createAssets([
@@ -293,22 +410,36 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
             },
           ]);
 
-          editor.createShape<TLImageShape>({
-            id,
-            type: "image",
-            x: basePoint.x + offset - size.width / 2,
-            y: basePoint.y + offset - size.height / 2,
-            props: {
-              w: size.width,
-              h: size.height,
-              playing: true,
-              url: "",
-              assetId,
-              crop: null,
-              flipX: false,
-              flipY: false,
-              altText: item.name,
-            },
+          const x = placeholderBounds
+            ? placeholderBounds.minX +
+              (placeholderBounds.width - size.width) / 2
+            : basePoint.x + offset - size.width / 2;
+          const y = placeholderBounds
+            ? placeholderBounds.minY +
+              (placeholderBounds.height - size.height) / 2
+            : basePoint.y + offset - size.height / 2;
+
+          editor.run(() => {
+            if (placeholderId && index === 0) {
+              editor.deleteShape(placeholderId);
+            }
+            editor.createShape<TLImageShape>({
+              id,
+              type: "image",
+              x,
+              y,
+              props: {
+                w: size.width,
+                h: size.height,
+                playing: true,
+                url: "",
+                assetId,
+                crop: null,
+                flipX: false,
+                flipY: false,
+                altText: item.name,
+              },
+            });
           });
           createdIds.push(id);
         }
@@ -317,8 +448,12 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
           editor.setSelectedShapes(createdIds);
         }
 
-        if (options?.autoAssignBase && createdIds.length > 0 && !findBaseImage(editor)) {
-          setBaseImage(editor, createdIds[0]);
+        if (
+          options?.autoAssignBase &&
+          createdIds.length > 0 &&
+          findBaseImages(editor).length === 0
+        ) {
+          toggleBaseRole(editor, [createdIds[0]]);
         }
       },
       [],
@@ -345,9 +480,7 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
       [addImageDataUrls, reportError],
     );
 
-    const runGeneration = useCallback(async () => {
-      if (isGenerating) return;
-
+    const enqueueGeneration = useCallback(async () => {
       const editor = editorRef.current;
 
       if (!editor) {
@@ -357,9 +490,27 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
 
       reportError(null);
 
-      let collection: GenerationCollection;
+      const pick = pickClusterFromSelection(editor);
+      if (!pick.ok) {
+        if (pick.error.kind === "no-base") {
+          reportError(
+            "Select a base image (and any inspirations) before generating. Use 'Toggle base' to mark one.",
+          );
+        } else {
+          reportError(
+            `Select exactly one base for this generation — ${pick.error.count} bases are currently selected.`,
+          );
+        }
+        return;
+      }
+
+      let collection: GenerationCollection | null;
       try {
-        collection = await collectGenerationInputs(editor);
+        collection = await collectGenerationInputs(
+          editor,
+          pick.baseShape,
+          pick.inspirationShapes,
+        );
       } catch (caught) {
         reportError(
           caught instanceof Error
@@ -369,28 +520,42 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         return;
       }
 
-      const trimmedDirection = direction.trim();
-
-      if (!collection.base && collection.inspirations.length === 0) {
-        reportError(
-          "Pin a base image or select at least one inspiration before generating.",
-        );
+      if (!collection) {
+        reportError("Could not read the base image.");
         return;
       }
+
+      const trimmedDirection = directionRef.current.trim();
+      const placeholderId = createShapeId() as TLShapeId;
+      const point = computePlaceholderPoint(
+        editor,
+        pick.baseShape,
+        countPlaceholdersNear(editor, pick.baseShape),
+      );
+
+      editor.createShape<GenerationPlaceholderShape>({
+        id: placeholderId,
+        type: GENERATION_PLACEHOLDER_TYPE,
+        x: point.x,
+        y: point.y,
+        props: {
+          w: PLACEHOLDER_W,
+          h: PLACEHOLDER_H,
+          state: "running",
+          label: `Generating with ${PROVIDER_LABELS[provider]}…`,
+          error: "",
+        },
+      });
 
       const formData = new FormData();
       formData.append("provider", provider);
       if (trimmedDirection) {
         formData.append("direction", trimmedDirection);
       }
-
-      if (collection.base) {
-        formData.append("baseImage", collection.base.composite, "base.png");
-        collection.base.textHints.forEach((hint) => {
-          formData.append("baseHints", hint);
-        });
-      }
-
+      formData.append("baseImage", collection.base.composite, "base.png");
+      collection.base.textHints.forEach((hint) => {
+        formData.append("baseHints", hint);
+      });
       collection.inspirations.forEach((input, index) => {
         formData.append(
           "inspirationImages",
@@ -400,54 +565,91 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         formData.append("inspirationHints", JSON.stringify(input.textHints));
       });
 
-      setIsGenerating(true);
-      setStatusMessage("Generating. This can take up to 2 min.");
+      const controller = new AbortController();
+      jobsRef.current.set(placeholderId, controller);
 
       try {
         const response = await fetch("/api/generate-scene", {
           method: "POST",
           body: formData,
+          signal: controller.signal,
         });
         const payload = await readSceneResponse(response);
+
+        if (controller.signal.aborted) return;
+
+        const stillThere = editor.getShape(placeholderId);
+        if (!stillThere) {
+          await addImageDataUrls(
+            [{ dataUrl: payload.image, name: "Generated interior scene" }],
+            { select: false, autoAssignBase: false },
+          );
+          return;
+        }
+
         await addImageDataUrls(
           [{ dataUrl: payload.image, name: "Generated interior scene" }],
-          { select: true, autoAssignBase: false },
+          { select: true, autoAssignBase: false, replacePlaceholderId: placeholderId },
         );
       } catch (caught) {
-        reportError(caught instanceof Error ? caught.message : "Generation failed.");
+        if (controller.signal.aborted) return;
+
+        const message =
+          caught instanceof Error ? caught.message : "Generation failed.";
+
+        const stillThere = editor.getShape(placeholderId);
+        if (stillThere && isPlaceholderShape(stillThere)) {
+          editor.updateShape<GenerationPlaceholderShape>({
+            id: placeholderId,
+            type: GENERATION_PLACEHOLDER_TYPE,
+            props: {
+              ...stillThere.props,
+              state: "error",
+              label: "Generation failed",
+              error: message,
+            },
+          });
+        }
+        reportError(message);
       } finally {
-        setIsGenerating(false);
-        setStatusMessage(null);
+        jobsRef.current.delete(placeholderId);
       }
-    }, [addImageDataUrls, direction, isGenerating, provider, reportError]);
+    }, [addImageDataUrls, provider, reportError]);
 
     useImperativeHandle(ref, () => ({ addFiles }), [addFiles]);
+
+    const handleMount = useCallback((editor: Editor) => {
+      editorRef.current = editor;
+
+      const orphanPlaceholders = editor
+        .getCurrentPageShapes()
+        .filter(isPlaceholderShape)
+        .filter((shape) => shape.props.state !== "error")
+        .map((shape) => shape.id);
+
+      if (orphanPlaceholders.length > 0) {
+        editor.deleteShapes(orphanPlaceholders);
+      }
+
+      return () => {
+        editorRef.current = null;
+      };
+    }, []);
 
     const components: TLComponents = useMemo(
       () => ({
         InFrontOfTheCanvas: () => <BaseImageBadge />,
         SharePanel: () => (
           <GenerateSharePanel
-            isGenerating={isGenerating}
-            statusMessage={statusMessage}
             errorMessage={errorMessage}
             provider={provider}
             onProviderChange={setProvider}
-            direction={direction}
-            onDirectionChange={setDirection}
-            onGenerate={runGeneration}
+            directionRef={directionRef}
+            onGenerate={enqueueGeneration}
           />
         ),
       }),
-      [
-        direction,
-        errorMessage,
-        isGenerating,
-        provider,
-        runGeneration,
-        setProvider,
-        statusMessage,
-      ],
+      [enqueueGeneration, errorMessage, provider, setProvider],
     );
 
     return (
@@ -483,14 +685,9 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         <Tldraw
           autoFocus
           persistenceKey="casa-design-board"
+          shapeUtils={customShapeUtils}
           components={components}
-          onMount={(editor) => {
-            editorRef.current = editor;
-
-            return () => {
-              editorRef.current = null;
-            };
-          }}
+          onMount={handleMount}
         />
         {isDraggingOver ? (
           <div className="drop-indicator">
@@ -504,94 +701,114 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
 
 function BaseImageBadge() {
   const editor = useEditor();
-  const placement = useValue(
-    "base image badge placement",
+  const placements = useValue(
+    "base image badge placements",
     () => {
-      const base = findBaseImage(editor);
-      if (!base) return null;
-      const bounds = editor.getShapePageBounds(base);
-      if (!bounds) return null;
-      const topLeft = editor.pageToViewport({ x: bounds.x, y: bounds.y });
-      return { x: topLeft.x, y: topLeft.y };
+      return findBaseImages(editor)
+        .map((shape) => {
+          const bounds = editor.getShapePageBounds(shape);
+          if (!bounds) return null;
+          const topLeft = editor.pageToViewport({ x: bounds.x, y: bounds.y });
+          return { id: shape.id, x: topLeft.x, y: topLeft.y };
+        })
+        .filter(
+          (entry): entry is { id: TLShapeId; x: number; y: number } => entry !== null,
+        );
     },
     [editor],
   );
 
-  if (!placement) return null;
+  if (placements.length === 0) return null;
 
   return (
-    <div
-      className="base-badge"
-      style={{
-        transform: `translate(${placement.x}px, ${placement.y}px)`,
-      }}
-    >
-      Base
-    </div>
+    <>
+      {placements.map((placement) => (
+        <div
+          key={placement.id}
+          className="base-badge"
+          style={{
+            transform: `translate(${placement.x}px, ${placement.y}px)`,
+          }}
+        >
+          Base
+        </div>
+      ))}
+    </>
   );
 }
 
 function GenerateSharePanel({
-  isGenerating,
-  statusMessage,
   errorMessage,
   provider,
   onProviderChange,
-  direction,
-  onDirectionChange,
+  directionRef,
   onGenerate,
 }: {
-  isGenerating: boolean;
-  statusMessage: string | null;
   errorMessage: string | null;
   provider: ImageProvider;
   onProviderChange: (next: ImageProvider) => void;
-  direction: string;
-  onDirectionChange: (next: string) => void;
+  directionRef: React.MutableRefObject<string>;
   onGenerate: () => void;
 }) {
   const editor = useEditor();
+  const [direction, setDirection] = useState(directionRef.current);
+
+  const handleDirectionChange = useCallback(
+    (next: string) => {
+      directionRef.current = next;
+      setDirection(next);
+    },
+    [directionRef],
+  );
 
   const summary = useValue(
     "generation summary",
     () => {
-      const base = findBaseImage(editor);
-      const selected = editor.getSelectedShapes().filter(isImageShape);
-      const selectedNonBase = selected.filter((s) => s.id !== base?.id);
-      const onlyOneSelected = selected.length === 1;
-      const singleSelected = onlyOneSelected ? selected[0] : null;
-      const singleSelectedIsBase = singleSelected
-        ? singleSelected.id === base?.id
-        : false;
+      const selectedImages = getSelectedImages(editor);
+      const selectedIds = selectedImages.map((s) => s.id);
+      const baseSelectionState = describeSelectionBaseState(selectedImages);
+      const selectedBaseCount = selectedImages.filter(
+        (s) => getRole(s) === "base",
+      ).length;
+      const totalBaseCount = findBaseImages(editor).length;
+      const inspirationCount = selectedImages.length - selectedBaseCount;
+      const runningCount = editor
+        .getCurrentPageShapes()
+        .filter(isPlaceholderShape)
+        .filter((shape) => shape.props.state === "running").length;
 
       return {
-        hasBase: Boolean(base),
-        baseId: base?.id ?? null,
-        inspirationCount: selectedNonBase.length,
-        canSetSelectedAsBase: Boolean(singleSelected) && !singleSelectedIsBase,
-        singleSelectedId: singleSelected?.id ?? null,
+        selectedImageCount: selectedImages.length,
+        selectedIds,
+        baseSelectionState,
+        selectedBaseCount,
+        inspirationCount,
+        totalBaseCount,
+        runningCount,
       };
     },
     [editor],
   );
 
-  const canGenerate =
-    !isGenerating && (summary.hasBase || summary.inspirationCount > 0);
-  const note = errorMessage ?? statusMessage;
+  const hasOneBaseInSelection = summary.selectedBaseCount === 1;
+  const canGenerate = hasOneBaseInSelection;
+  const note = errorMessage;
+
+  let toggleLabel = "Toggle base";
+  if (summary.baseSelectionState === "none-base") toggleLabel = "Mark as base";
+  else if (summary.baseSelectionState === "all-base") toggleLabel = "Unmark base";
 
   let label: string;
-  if (isGenerating) {
-    label = "Generating...";
-  } else if (!summary.hasBase && summary.inspirationCount === 0) {
-    label = "Generate";
-  } else if (summary.hasBase && summary.inspirationCount > 0) {
-    label = `Generate from base + ${summary.inspirationCount} inspiration${
-      summary.inspirationCount === 1 ? "" : "s"
-    }`;
-  } else if (summary.hasBase) {
+  if (summary.selectedImageCount === 0) {
+    label = "Select a base + inspirations";
+  } else if (summary.selectedBaseCount === 0) {
+    label = "Mark one selected image as base";
+  } else if (summary.selectedBaseCount > 1) {
+    label = `Select only one base (${summary.selectedBaseCount} chosen)`;
+  } else if (summary.inspirationCount === 0) {
     label = "Generate from base";
   } else {
-    label = `Generate from ${summary.inspirationCount} inspiration${
+    label = `Generate from base + ${summary.inspirationCount} inspiration${
       summary.inspirationCount === 1 ? "" : "s"
     }`;
   }
@@ -604,7 +821,6 @@ function GenerateSharePanel({
             key={option}
             type="button"
             className={`tlui-button provider-toggle__option`}
-            disabled={isGenerating}
             aria-pressed={provider === option}
             onClick={() => onProviderChange(option)}
           >
@@ -615,28 +831,33 @@ function GenerateSharePanel({
 
       <div className="role-controls">
         <span className="role-label">
-          Base: <strong>{summary.hasBase ? "set" : "none"}</strong>
+          Bases: <strong>{summary.totalBaseCount}</strong>
+          {summary.selectedImageCount > 0 ? (
+            <>
+              {" · "}selected{" "}
+              <strong>
+                {summary.selectedBaseCount} base
+                {summary.selectedBaseCount === 1 ? "" : "s"}
+              </strong>
+              {summary.inspirationCount > 0 ? (
+                <>
+                  {" + "}
+                  <strong>
+                    {summary.inspirationCount} insp.
+                  </strong>
+                </>
+              ) : null}
+            </>
+          ) : null}
         </span>
-        {summary.canSetSelectedAsBase && summary.singleSelectedId ? (
-          <button
-            className="tlui-button role-button"
-            type="button"
-            disabled={isGenerating}
-            onClick={() => setBaseImage(editor, summary.singleSelectedId)}
-          >
-            <span className="tlui-button__label">Set as base</span>
-          </button>
-        ) : null}
-        {summary.hasBase ? (
-          <button
-            className="tlui-button role-button"
-            type="button"
-            disabled={isGenerating}
-            onClick={() => setBaseImage(editor, null)}
-          >
-            <span className="tlui-button__label">Clear base</span>
-          </button>
-        ) : null}
+        <button
+          className="tlui-button role-button"
+          type="button"
+          disabled={summary.selectedImageCount === 0}
+          onClick={() => toggleBaseRole(editor, summary.selectedIds)}
+        >
+          <span className="tlui-button__label">{toggleLabel}</span>
+        </button>
       </div>
 
       <input
@@ -644,14 +865,16 @@ function GenerateSharePanel({
         type="text"
         placeholder="Optional direction (e.g. cozy, evening light)"
         value={direction}
-        disabled={isGenerating}
-        onChange={(event) => onDirectionChange(event.target.value)}
+        onChange={(event) => handleDirectionChange(event.target.value)}
+        onPointerDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
+          event.stopPropagation();
           if (event.key === "Enter" && canGenerate) {
             event.preventDefault();
             onGenerate();
           }
         }}
+        onKeyUp={(event) => event.stopPropagation()}
       />
 
       <button
@@ -663,12 +886,15 @@ function GenerateSharePanel({
         <span className="tlui-button__label">{label}</span>
       </button>
 
-      {note ? (
-        <div
-          className={`generate-status${errorMessage ? " generate-status--error" : ""}`}
-        >
-          {note}
+      {summary.runningCount > 0 ? (
+        <div className="generate-status">
+          {summary.runningCount} generation{summary.runningCount === 1 ? "" : "s"} in
+          progress
         </div>
+      ) : null}
+
+      {note ? (
+        <div className="generate-status generate-status--error">{note}</div>
       ) : null}
     </div>
   );
