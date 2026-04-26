@@ -183,6 +183,8 @@ type GenerationCollection = {
   baseShape: TLImageShape;
 };
 
+const MAX_UPLOAD_LONG_EDGE = 1024;
+
 async function flattenImageWithAnnotations(
   editor: Editor,
   imageShape: TLImageShape,
@@ -200,13 +202,16 @@ async function flattenImageWithAnnotations(
     return bounds ? bounds.collides(imageBounds) : false;
   });
 
+  const longEdge = Math.max(imageBounds.width, imageBounds.height);
+  const scale = longEdge > 0 ? Math.min(1, MAX_UPLOAD_LONG_EDGE / longEdge) : 1;
+
   const ids = [imageShape.id, ...overlapping.map((shape) => shape.id)];
   const result = await editor.toImage(ids, {
     format: "png",
     background: false,
     padding: 0,
     bounds: imageBounds,
-    scale: 1,
+    scale,
   });
 
   const textHints = overlapping
