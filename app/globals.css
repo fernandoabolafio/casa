@@ -1,0 +1,138 @@
+:root {
+  color-scheme: dark;
+  --background: #11100d;
+  --text: #f6edda;
+  --muted: #b6a88b;
+  --accent: #d9a441;
+  --accent-strong: #ffce6a;
+  --danger: #ff8d7a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #13110e;
+  color: var(--text);
+  font-family:
+    "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.studio-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.board-shell {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.board-shell .tl-container {
+  background: #14110d;
+}
+
+.drop-indicator {
+  pointer-events: none;
+  position: absolute;
+  inset: 1rem;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 206, 106, 0.62);
+  border-radius: 22px;
+  background: rgba(10, 9, 7, 0.18);
+  color: var(--accent-strong);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.generate-share-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 6px;
+  pointer-events: auto;
+}
+
+.generate-share-panel .generate-button {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.provider-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--tl-color-low);
+  border: 1px solid var(--tl-color-low-border);
+}
+
+.provider-toggle__option.tlui-button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tl-color-text-1);
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.65;
+}
+
+.provider-toggle__option.tlui-button:hover:not(:disabled) {
+  background: var(--tl-color-muted-2);
+  opacity: 1;
+}
+
+.provider-toggle__option.tlui-button[aria-pressed="true"] {
+  background: var(--tl-color-selected);
+  color: var(--tl-color-selected-contrast);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.provider-toggle__option.tlui-button[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--tl-color-selected);
+  color: var(--tl-color-selected-contrast);
+}
+
+.generate-status {
+  max-width: 280px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--tl-color-low);
+  color: var(--tl-color-text-1);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.generate-status--error {
+  background: rgba(255, 141, 122, 0.12);
+  color: var(--danger);
+}
