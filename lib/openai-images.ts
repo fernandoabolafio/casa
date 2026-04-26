@@ -84,6 +84,7 @@ export type SceneRequest = {
   provider: ImageProvider;
   quality: ImageQuality;
   base?: SceneReference | null;
+  references?: SceneReference[];
   inspirations?: SceneReference[];
   direction?: string;
 };
@@ -94,6 +95,12 @@ const SYSTEM_PREAMBLE =
 const BASE_INSTRUCTIONS =
   "BASE IMAGE — the room to redesign. PRESERVE its geometry, walls, windows, doors, ceiling height, perspective, camera angle, daylight direction, and overall layout. Treat any annotations on this image as targeted edits to apply in those specific regions.";
 
+const BASE_EXTEND_AMENDMENT =
+  "EXTEND MODE — the base shows a DIFFERENT CAMERA ANGLE / VIEWPOINT of the SAME PHYSICAL ROOM that appears in the design references below. Preserve the base's geometry, perspective, and which surfaces are visible from this angle, but identify which walls, floor sections, doors, windows, and pieces of furniture in the base correspond to those in the references and finish them IDENTICALLY (same paint color, same wood tone, same upholstery, same materials, same lighting temperature). Out-of-frame elements that are present in references but not in this base view should be omitted; new elements visible from this angle that are absent from the references should be inferred coherently with the established design.";
+
+const REFERENCE_INSTRUCTIONS =
+  "DESIGN REFERENCES — these are prior renders (or photographs) of the SAME room that the base belongs to. Treat them as the LOCKED design state of the room. Identify every concrete design decision they show — wall paint colors and finishes, ceiling treatment, flooring material and direction, the specific sofa / chairs / tables / beds / lamps / rugs / curtains / artwork / plants / hardware, the specific materials and textures, the lighting temperature and intensity — and reproduce the SAME items and finishes in the new view. Match colors as closely as possible (same paint family, same wood tone, same fabric). Do NOT redesign or substitute these elements. Annotations on a reference clarify which elements matter most or are non-negotiable.";
+
 const INSPIRATION_INSTRUCTIONS =
   "STYLE INSPIRATIONS — borrow ONLY their aesthetic, color palette, materials, finishes, lighting mood, furniture silhouettes, and decor language. Do NOT copy their geometry, layout, perspective, or specific room contents. Annotations on an inspiration image highlight the qualities the user wants borrowed.";
 
@@ -101,7 +108,7 @@ const STYLE_ONLY_INSTRUCTIONS =
   "No base room was provided. Synthesize a new coherent interior scene that captures the combined aesthetic of the inspirations.";
 
 const FINAL_INSTRUCTIONS =
-  "Produce a single new photorealistic interior scene that satisfies the directives above. Do not render the annotation marks themselves in the output.";
+  "Produce a single new photorealistic interior scene that satisfies the directives above. Conflict resolution: BASE wins on geometry/perspective; DESIGN REFERENCES win on color, material, and specific furnishings; INSPIRATIONS only fill gaps the base and references do not resolve; the USER DIRECTION overrides specific items it names. Do not render the annotation marks themselves in the output.";
 
 function formatHintsBlock(label: string, hints: string[]): string | null {
   if (hints.length === 0) return null;
@@ -113,9 +120,12 @@ function formatHintsBlock(label: string, hints: string[]): string | null {
 
 export async function generateScene(request: SceneRequest) {
   const inspirations = request.inspirations ?? [];
+  const references = request.references ?? [];
 
-  if (!request.base && inspirations.length === 0) {
-    throw new Error("Provide a base image or at least one inspiration.");
+  if (!request.base && inspirations.length === 0 && references.length === 0) {
+    throw new Error(
+      "Provide a base image, a design reference, or at least one inspiration.",
+    );
   }
 
   if (request.provider === "gemini") {
@@ -129,23 +139,44 @@ type OpenAIContentPart =
   | { type: "input_text"; text: string }
   | { type: "input_image"; image_url: string; detail: "high" };
 
+async function imageToOpenAIPart(
+  image: File | string,
+): Promise<OpenAIContentPart> {
+  return {
+    type: "input_image",
+    image_url: image instanceof File ? await fileToDataUrl(image) : image,
+    detail: "high",
+  };
+}
+
 async function buildOpenAIContent(request: SceneRequest): Promise<OpenAIContentPart[]> {
   const inspirations = request.inspirations ?? [];
+  const references = request.references ?? [];
+  const hasReferences = references.length > 0;
   const parts: OpenAIContentPart[] = [{ type: "input_text", text: SYSTEM_PREAMBLE }];
 
   if (request.base) {
-    const text = [BASE_INSTRUCTIONS, formatHintsBlock("Annotations on the base", request.base.hints)]
-      .filter(Boolean)
-      .join("\n");
-    parts.push({ type: "input_text", text });
-    parts.push({
-      type: "input_image",
-      image_url:
-        request.base.image instanceof File
-          ? await fileToDataUrl(request.base.image)
-          : request.base.image,
-      detail: "high",
-    });
+    const baseLines = [BASE_INSTRUCTIONS];
+    if (hasReferences) baseLines.push(BASE_EXTEND_AMENDMENT);
+    const hintBlock = formatHintsBlock("Annotations on the base", request.base.hints);
+    if (hintBlock) baseLines.push(hintBlock);
+    parts.push({ type: "input_text", text: baseLines.join("\n\n") });
+    parts.push(await imageToOpenAIPart(request.base.image));
+  }
+
+  if (hasReferences) {
+    parts.push({ type: "input_text", text: REFERENCE_INSTRUCTIONS });
+
+    for (const [index, reference] of references.entries()) {
+      const headerLines = [`Design reference #${index + 1}:`];
+      const hintBlock = formatHintsBlock(
+        "Locked elements / clarifications",
+        reference.hints,
+      );
+      if (hintBlock) headerLines.push(hintBlock);
+      parts.push({ type: "input_text", text: headerLines.join("\n") });
+      parts.push(await imageToOpenAIPart(reference.image));
+    }
   }
 
   if (inspirations.length > 0) {
@@ -159,14 +190,7 @@ async function buildOpenAIContent(request: SceneRequest): Promise<OpenAIContentP
       const hintBlock = formatHintsBlock("What to borrow", inspiration.hints);
       if (hintBlock) headerLines.push(hintBlock);
       parts.push({ type: "input_text", text: headerLines.join("\n") });
-      parts.push({
-        type: "input_image",
-        image_url:
-          inspiration.image instanceof File
-            ? await fileToDataUrl(inspiration.image)
-            : inspiration.image,
-        detail: "high",
-      });
+      parts.push(await imageToOpenAIPart(inspiration.image));
     }
   }
 
@@ -231,14 +255,32 @@ type GeminiPart =
 
 async function buildGeminiParts(request: SceneRequest): Promise<GeminiPart[]> {
   const inspirations = request.inspirations ?? [];
+  const references = request.references ?? [];
+  const hasReferences = references.length > 0;
   const parts: GeminiPart[] = [{ text: SYSTEM_PREAMBLE }];
 
   if (request.base) {
-    const text = [BASE_INSTRUCTIONS, formatHintsBlock("Annotations on the base", request.base.hints)]
-      .filter(Boolean)
-      .join("\n");
-    parts.push({ text });
+    const baseLines = [BASE_INSTRUCTIONS];
+    if (hasReferences) baseLines.push(BASE_EXTEND_AMENDMENT);
+    const hintBlock = formatHintsBlock("Annotations on the base", request.base.hints);
+    if (hintBlock) baseLines.push(hintBlock);
+    parts.push({ text: baseLines.join("\n\n") });
     parts.push({ inlineData: await referenceToInlineData(request.base.image) });
+  }
+
+  if (hasReferences) {
+    parts.push({ text: REFERENCE_INSTRUCTIONS });
+
+    for (const [index, reference] of references.entries()) {
+      const headerLines = [`Design reference #${index + 1}:`];
+      const hintBlock = formatHintsBlock(
+        "Locked elements / clarifications",
+        reference.hints,
+      );
+      if (hintBlock) headerLines.push(hintBlock);
+      parts.push({ text: headerLines.join("\n") });
+      parts.push({ inlineData: await referenceToInlineData(reference.image) });
+    }
   }
 
   if (inspirations.length > 0) {

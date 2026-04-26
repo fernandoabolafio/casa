@@ -138,7 +138,7 @@ a {
   border-color: var(--tl-color-selected);
 }
 
-.base-badge {
+.role-badge {
   position: absolute;
   top: 0;
   left: 0;
@@ -146,14 +146,28 @@ a {
   margin: 6px 0 0 6px;
   padding: 2px 8px;
   border-radius: 6px;
-  background: var(--tl-color-selected);
-  color: var(--tl-color-selected-contrast);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   pointer-events: none;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.role-badge--base {
+  background: var(--tl-color-selected);
+  color: var(--tl-color-selected-contrast);
+}
+
+.role-badge--reference {
+  background: #6f5cd1;
+  color: #fff;
+}
+
+.role-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .provider-toggle {

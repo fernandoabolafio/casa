@@ -99,52 +99,58 @@ function isPlaceholderShape(
   return Boolean(shape && shape.type === GENERATION_PLACEHOLDER_TYPE);
 }
 
-function getRole(shape: TLShape): "base" | undefined {
+type ImageRole = "base" | "reference";
+
+function getRole(shape: TLShape): ImageRole | undefined {
   const role = (shape.meta as { role?: string } | undefined)?.role;
-  return role === "base" ? "base" : undefined;
+  return role === "base" || role === "reference" ? role : undefined;
 }
 
-function findBaseImages(editor: Editor): TLImageShape[] {
+function findImagesByRole(editor: Editor, role: ImageRole): TLImageShape[] {
   return editor
     .getCurrentPageShapes()
     .filter(isImageShape)
-    .filter((shape) => getRole(shape) === "base");
+    .filter((shape) => getRole(shape) === role);
 }
 
 function getSelectedImages(editor: Editor): TLImageShape[] {
   return editor.getSelectedShapes().filter(isImageShape);
 }
 
-type SelectionBaseState = "none" | "all-base" | "none-base" | "mixed";
+type SelectionRoleState = "none" | "all" | "none-of" | "mixed";
 
-function describeSelectionBaseState(images: TLImageShape[]): SelectionBaseState {
+function describeSelectionRoleState(
+  images: TLImageShape[],
+  role: ImageRole,
+): SelectionRoleState {
   if (images.length === 0) return "none";
-  const baseCount = images.filter((s) => getRole(s) === "base").length;
-  if (baseCount === 0) return "none-base";
-  if (baseCount === images.length) return "all-base";
+  const matching = images.filter((s) => getRole(s) === role).length;
+  if (matching === 0) return "none-of";
+  if (matching === images.length) return "all";
   return "mixed";
 }
 
 /**
- * Toggle base role on the given image shapes.
- * - If every shape is already a base, all are unmarked.
- * - Otherwise, every shape is marked as base.
- * Multiple bases can coexist (one per generation cluster).
+ * Toggle a role on the given image shapes.
+ * - If every shape is already at this role, all are unmarked.
+ * - Otherwise, every shape is set to this role (overriding any previous role).
+ * Multiple bases / references can coexist (one base per generation cluster,
+ * any number of design references).
  */
-function toggleBaseRole(editor: Editor, ids: TLShapeId[]) {
+function toggleRole(editor: Editor, ids: TLShapeId[], role: ImageRole) {
   const shapes = ids
     .map((id) => editor.getShape(id))
     .filter((shape): shape is TLImageShape => isImageShape(shape));
 
   if (shapes.length === 0) return;
 
-  const allBase = shapes.every((shape) => getRole(shape) === "base");
-  const targetIsBase = !allBase;
+  const allAtRole = shapes.every((shape) => getRole(shape) === role);
+  const target: ImageRole | "" = allAtRole ? "" : role;
 
   const updates = shapes.map((shape) => ({
     id: shape.id,
     type: "image" as const,
-    meta: { role: targetIsBase ? ("base" as const) : "" },
+    meta: { role: target },
   }));
 
   editor.updateShapes(updates);
@@ -172,6 +178,7 @@ type CollectedInput = {
 
 type GenerationCollection = {
   base: CollectedInput;
+  references: CollectedInput[];
   inspirations: CollectedInput[];
   baseShape: TLImageShape;
 };
@@ -217,7 +224,12 @@ type ClusterPickError =
 function pickClusterFromSelection(
   editor: Editor,
 ):
-  | { ok: true; baseShape: TLImageShape; inspirationShapes: TLImageShape[] }
+  | {
+      ok: true;
+      baseShape: TLImageShape;
+      referenceShapes: TLImageShape[];
+      inspirationShapes: TLImageShape[];
+    }
   | { ok: false; error: ClusterPickError } {
   const selected = getSelectedImages(editor);
   const bases = selected.filter((shape) => getRole(shape) === "base");
@@ -230,18 +242,31 @@ function pickClusterFromSelection(
   }
 
   const baseShape = bases[0];
-  const inspirationShapes = selected.filter((shape) => shape.id !== baseShape.id);
-  return { ok: true, baseShape, inspirationShapes };
+  const remaining = selected.filter((shape) => shape.id !== baseShape.id);
+  const referenceShapes = remaining.filter(
+    (shape) => getRole(shape) === "reference",
+  );
+  const inspirationShapes = remaining.filter(
+    (shape) => getRole(shape) !== "reference",
+  );
+  return { ok: true, baseShape, referenceShapes, inspirationShapes };
 }
 
 async function collectGenerationInputs(
   editor: Editor,
   baseShape: TLImageShape,
+  referenceShapes: TLImageShape[],
   inspirationShapes: TLImageShape[],
 ): Promise<GenerationCollection | null> {
   const allShapes = editor.getCurrentPageShapes();
   const base = await flattenImageWithAnnotations(editor, baseShape, allShapes);
   if (!base) return null;
+
+  const references: CollectedInput[] = [];
+  for (const shape of referenceShapes) {
+    const collected = await flattenImageWithAnnotations(editor, shape, allShapes);
+    if (collected) references.push(collected);
+  }
 
   const inspirations: CollectedInput[] = [];
   for (const shape of inspirationShapes) {
@@ -249,7 +274,7 @@ async function collectGenerationInputs(
     if (collected) inspirations.push(collected);
   }
 
-  return { base, inspirations, baseShape };
+  return { base, references, inspirations, baseShape };
 }
 
 async function readSceneResponse(response: Response): Promise<ApiSceneResponse> {
@@ -451,9 +476,9 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         if (
           options?.autoAssignBase &&
           createdIds.length > 0 &&
-          findBaseImages(editor).length === 0
+          findImagesByRole(editor, "base").length === 0
         ) {
-          toggleBaseRole(editor, [createdIds[0]]);
+          toggleRole(editor, [createdIds[0]], "base");
         }
       },
       [],
@@ -509,6 +534,7 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         collection = await collectGenerationInputs(
           editor,
           pick.baseShape,
+          pick.referenceShapes,
           pick.inspirationShapes,
         );
       } catch (caught) {
@@ -555,6 +581,14 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
       formData.append("baseImage", collection.base.composite, "base.png");
       collection.base.textHints.forEach((hint) => {
         formData.append("baseHints", hint);
+      });
+      collection.references.forEach((input, index) => {
+        formData.append(
+          "referenceImages",
+          input.composite,
+          `reference-${index}.png`,
+        );
+        formData.append("referenceHints", JSON.stringify(input.textHints));
       });
       collection.inspirations.forEach((input, index) => {
         formData.append(
@@ -638,7 +672,7 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
 
     const components: TLComponents = useMemo(
       () => ({
-        InFrontOfTheCanvas: () => <BaseImageBadge />,
+        InFrontOfTheCanvas: () => <RoleBadges />,
         SharePanel: () => (
           <GenerateSharePanel
             errorMessage={errorMessage}
@@ -699,21 +733,21 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
   },
 );
 
-function BaseImageBadge() {
+function RoleBadges() {
   const editor = useEditor();
   const placements = useValue(
-    "base image badge placements",
+    "role badge placements",
     () => {
-      return findBaseImages(editor)
-        .map((shape) => {
+      const all: Array<{ id: TLShapeId; role: ImageRole; x: number; y: number }> = [];
+      for (const role of ["base", "reference"] as const) {
+        for (const shape of findImagesByRole(editor, role)) {
           const bounds = editor.getShapePageBounds(shape);
-          if (!bounds) return null;
+          if (!bounds) continue;
           const topLeft = editor.pageToViewport({ x: bounds.x, y: bounds.y });
-          return { id: shape.id, x: topLeft.x, y: topLeft.y };
-        })
-        .filter(
-          (entry): entry is { id: TLShapeId; x: number; y: number } => entry !== null,
-        );
+          all.push({ id: shape.id, role, x: topLeft.x, y: topLeft.y });
+        }
+      }
+      return all;
     },
     [editor],
   );
@@ -724,13 +758,13 @@ function BaseImageBadge() {
     <>
       {placements.map((placement) => (
         <div
-          key={placement.id}
-          className="base-badge"
+          key={`${placement.role}-${placement.id}`}
+          className={`role-badge role-badge--${placement.role}`}
           style={{
             transform: `translate(${placement.x}px, ${placement.y}px)`,
           }}
         >
-          Base
+          {placement.role === "base" ? "Base" : "Ref"}
         </div>
       ))}
     </>
@@ -766,12 +800,21 @@ function GenerateSharePanel({
     () => {
       const selectedImages = getSelectedImages(editor);
       const selectedIds = selectedImages.map((s) => s.id);
-      const baseSelectionState = describeSelectionBaseState(selectedImages);
+      const baseSelectionState = describeSelectionRoleState(selectedImages, "base");
+      const referenceSelectionState = describeSelectionRoleState(
+        selectedImages,
+        "reference",
+      );
       const selectedBaseCount = selectedImages.filter(
         (s) => getRole(s) === "base",
       ).length;
-      const totalBaseCount = findBaseImages(editor).length;
-      const inspirationCount = selectedImages.length - selectedBaseCount;
+      const selectedReferenceCount = selectedImages.filter(
+        (s) => getRole(s) === "reference",
+      ).length;
+      const inspirationCount =
+        selectedImages.length - selectedBaseCount - selectedReferenceCount;
+      const totalBaseCount = findImagesByRole(editor, "base").length;
+      const totalReferenceCount = findImagesByRole(editor, "reference").length;
       const runningCount = editor
         .getCurrentPageShapes()
         .filter(isPlaceholderShape)
@@ -781,9 +824,12 @@ function GenerateSharePanel({
         selectedImageCount: selectedImages.length,
         selectedIds,
         baseSelectionState,
+        referenceSelectionState,
         selectedBaseCount,
+        selectedReferenceCount,
         inspirationCount,
         totalBaseCount,
+        totalReferenceCount,
         runningCount,
       };
     },
@@ -794,17 +840,39 @@ function GenerateSharePanel({
   const canGenerate = hasOneBaseInSelection;
   const note = errorMessage;
 
-  let toggleLabel = "Toggle base";
-  if (summary.baseSelectionState === "none-base") toggleLabel = "Mark as base";
-  else if (summary.baseSelectionState === "all-base") toggleLabel = "Unmark base";
+  const baseToggleLabel =
+    summary.baseSelectionState === "all"
+      ? "Unmark base"
+      : summary.baseSelectionState === "none-of"
+        ? "Mark as base"
+        : "Toggle base";
+
+  const referenceToggleLabel =
+    summary.referenceSelectionState === "all"
+      ? "Unmark reference"
+      : summary.referenceSelectionState === "none-of"
+        ? "Mark as reference"
+        : "Toggle reference";
+
+  const isExtend = summary.selectedReferenceCount > 0;
 
   let label: string;
   if (summary.selectedImageCount === 0) {
-    label = "Select a base + inspirations";
+    label = "Select a base (+ refs / inspirations)";
   } else if (summary.selectedBaseCount === 0) {
     label = "Mark one selected image as base";
   } else if (summary.selectedBaseCount > 1) {
     label = `Select only one base (${summary.selectedBaseCount} chosen)`;
+  } else if (isExtend) {
+    const refs = `${summary.selectedReferenceCount} reference${
+      summary.selectedReferenceCount === 1 ? "" : "s"
+    }`;
+    label =
+      summary.inspirationCount === 0
+        ? `Extend from ${refs}`
+        : `Extend from ${refs} + ${summary.inspirationCount} inspiration${
+            summary.inspirationCount === 1 ? "" : "s"
+          }`;
   } else if (summary.inspirationCount === 0) {
     label = "Generate from base";
   } else {
@@ -832,32 +900,38 @@ function GenerateSharePanel({
       <div className="role-controls">
         <span className="role-label">
           Bases: <strong>{summary.totalBaseCount}</strong>
+          {" · "}Refs: <strong>{summary.totalReferenceCount}</strong>
           {summary.selectedImageCount > 0 ? (
             <>
-              {" · "}selected{" "}
+              {" · "}sel{" "}
               <strong>
-                {summary.selectedBaseCount} base
-                {summary.selectedBaseCount === 1 ? "" : "s"}
+                {summary.selectedBaseCount}b
+                {" / "}
+                {summary.selectedReferenceCount}r
+                {" / "}
+                {summary.inspirationCount}i
               </strong>
-              {summary.inspirationCount > 0 ? (
-                <>
-                  {" + "}
-                  <strong>
-                    {summary.inspirationCount} insp.
-                  </strong>
-                </>
-              ) : null}
             </>
           ) : null}
         </span>
-        <button
-          className="tlui-button role-button"
-          type="button"
-          disabled={summary.selectedImageCount === 0}
-          onClick={() => toggleBaseRole(editor, summary.selectedIds)}
-        >
-          <span className="tlui-button__label">{toggleLabel}</span>
-        </button>
+        <div className="role-buttons">
+          <button
+            className="tlui-button role-button"
+            type="button"
+            disabled={summary.selectedImageCount === 0}
+            onClick={() => toggleRole(editor, summary.selectedIds, "base")}
+          >
+            <span className="tlui-button__label">{baseToggleLabel}</span>
+          </button>
+          <button
+            className="tlui-button role-button"
+            type="button"
+            disabled={summary.selectedImageCount === 0}
+            onClick={() => toggleRole(editor, summary.selectedIds, "reference")}
+          >
+            <span className="tlui-button__label">{referenceToggleLabel}</span>
+          </button>
+        </div>
       </div>
 
       <input

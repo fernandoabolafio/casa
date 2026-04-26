@@ -57,7 +57,21 @@ export async function POST(request: Request) {
       hints: inspirationHintArrays[index] ?? [],
     }));
 
-    if (!baseImage && inspirations.length === 0) {
+    const referenceFiles = formData
+      .getAll("referenceImages")
+      .filter((item): item is File | string =>
+        item instanceof File || typeof item === "string",
+      );
+    const referenceHintArrays = formData
+      .getAll("referenceHints")
+      .map(parseHintArray);
+
+    const references = referenceFiles.map((image, index) => ({
+      image,
+      hints: referenceHintArrays[index] ?? [],
+    }));
+
+    if (!baseImage && inspirations.length === 0 && references.length === 0) {
       return NextResponse.json(
         {
           error:
@@ -72,6 +86,7 @@ export async function POST(request: Request) {
       quality,
       direction: direction || undefined,
       base: baseImage ? { image: baseImage, hints: baseHints } : null,
+      references,
       inspirations,
     });
 
