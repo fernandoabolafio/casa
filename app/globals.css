@@ -71,9 +71,10 @@ a {
 .generate-share-panel {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 6px;
   padding: 6px;
+  width: 280px;
   pointer-events: auto;
 }
 
@@ -82,6 +83,77 @@ a {
   padding: 0 14px;
   border-radius: 8px;
   font-weight: 600;
+}
+
+.role-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--tl-color-text-1);
+}
+
+.role-label {
+  margin-right: auto;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.role-label strong {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.role-button.tlui-button {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--tl-color-low);
+  border: 1px solid var(--tl-color-low-border);
+}
+
+.role-button.tlui-button:hover:not(:disabled) {
+  background: var(--tl-color-muted-2);
+}
+
+.direction-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--tl-color-low-border);
+  background: var(--tl-color-panel);
+  color: var(--tl-color-text);
+  font-size: 13px;
+  outline: none;
+}
+
+.direction-input:focus {
+  border-color: var(--tl-color-selected);
+}
+
+.base-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  margin: 6px 0 0 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--tl-color-selected);
+  color: var(--tl-color-selected-contrast);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .provider-toggle {

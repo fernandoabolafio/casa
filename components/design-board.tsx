@@ -18,6 +18,7 @@ import {
   type TLComponents,
   type TLImageShape,
   type TLShape,
+  type TLShapeId,
   type TLTextShape,
   type VecLike,
   useEditor,
@@ -35,6 +36,7 @@ const PROVIDER_LABELS: Record<ImageProvider, string> = {
 type AddImageOptions = {
   point?: VecLike;
   select?: boolean;
+  autoAssignBase?: boolean;
 };
 
 export type DesignBoardHandle = {
@@ -80,6 +82,42 @@ function isTextShape(shape: TLShape): shape is TLTextShape {
   return shape.type === "text";
 }
 
+function getRole(shape: TLShape): "base" | undefined {
+  const role = (shape.meta as { role?: string } | undefined)?.role;
+  return role === "base" ? "base" : undefined;
+}
+
+function findBaseImage(editor: Editor): TLImageShape | null {
+  return (
+    editor
+      .getCurrentPageShapes()
+      .filter(isImageShape)
+      .find((shape) => getRole(shape) === "base") ?? null
+  );
+}
+
+function setBaseImage(editor: Editor, nextBaseId: TLShapeId | null) {
+  const allImages = editor.getCurrentPageShapes().filter(isImageShape);
+  const updates = allImages
+    .filter((shape) => getRole(shape) === "base" || shape.id === nextBaseId)
+    .map((shape) => {
+      const meta = (shape.meta ?? {}) as Record<string, unknown>;
+      const { role: _ignored, ...rest } = meta as { role?: unknown };
+      return {
+        id: shape.id,
+        type: "image" as const,
+        meta:
+          shape.id === nextBaseId
+            ? { ...rest, role: "base" as const }
+            : rest,
+      };
+    });
+
+  if (updates.length > 0) {
+    editor.updateShapes(updates);
+  }
+}
+
 function richTextToPlainText(node: unknown): string {
   if (!node || typeof node !== "object") return "";
   const record = node as { text?: unknown; content?: unknown };
@@ -95,54 +133,69 @@ function richTextToPlainText(node: unknown): string {
   return "";
 }
 
-type GenerationInput = {
+type CollectedInput = {
   composite: Blob;
   textHints: string[];
 };
 
-async function collectGenerationInputs(editor: Editor): Promise<GenerationInput[]> {
+type GenerationCollection = {
+  base: CollectedInput | null;
+  inspirations: CollectedInput[];
+};
+
+async function flattenImageWithAnnotations(
+  editor: Editor,
+  imageShape: TLImageShape,
+  allShapes: TLShape[],
+): Promise<CollectedInput | null> {
+  const imageBounds = editor.getShapePageBounds(imageShape);
+  if (!imageBounds) return null;
+
+  const overlapping = allShapes.filter((shape) => {
+    if (shape.id === imageShape.id) return false;
+    if (isImageShape(shape)) return false;
+
+    const bounds = editor.getShapePageBounds(shape);
+    return bounds ? bounds.collides(imageBounds) : false;
+  });
+
+  const ids = [imageShape.id, ...overlapping.map((shape) => shape.id)];
+  const result = await editor.toImage(ids, {
+    format: "png",
+    background: false,
+    padding: 0,
+    bounds: imageBounds,
+    scale: 1,
+  });
+
+  const textHints = overlapping
+    .filter(isTextShape)
+    .map((shape) => richTextToPlainText(shape.props.richText).trim())
+    .filter((text): text is string => Boolean(text));
+
+  return { composite: result.blob, textHints };
+}
+
+async function collectGenerationInputs(editor: Editor): Promise<GenerationCollection> {
+  const allShapes = editor.getCurrentPageShapes();
+  const baseShape = findBaseImage(editor);
   const selectedImages = editor.getSelectedShapes().filter(isImageShape);
 
-  if (selectedImages.length === 0) {
-    return [];
+  const base = baseShape
+    ? await flattenImageWithAnnotations(editor, baseShape, allShapes)
+    : null;
+
+  const inspirationShapes = selectedImages.filter(
+    (shape) => shape.id !== baseShape?.id,
+  );
+
+  const inspirations: CollectedInput[] = [];
+  for (const shape of inspirationShapes) {
+    const collected = await flattenImageWithAnnotations(editor, shape, allShapes);
+    if (collected) inspirations.push(collected);
   }
 
-  const allShapes = editor.getCurrentPageShapes();
-  const inputs: GenerationInput[] = [];
-
-  for (const image of selectedImages) {
-    const imageBounds = editor.getShapePageBounds(image);
-
-    if (!imageBounds) {
-      continue;
-    }
-
-    const overlapping = allShapes.filter((shape) => {
-      if (shape.id === image.id) return false;
-      if (isImageShape(shape)) return false;
-
-      const bounds = editor.getShapePageBounds(shape);
-      return bounds ? bounds.collides(imageBounds) : false;
-    });
-
-    const ids = [image.id, ...overlapping.map((shape) => shape.id)];
-    const result = await editor.toImage(ids, {
-      format: "png",
-      background: false,
-      padding: 0,
-      bounds: imageBounds,
-      scale: 1,
-    });
-
-    const textHints = overlapping
-      .filter(isTextShape)
-      .map((shape) => richTextToPlainText(shape.props.richText).trim())
-      .filter((text): text is string => Boolean(text));
-
-    inputs.push({ composite: result.blob, textHints });
-  }
-
-  return inputs;
+  return { base, inspirations };
 }
 
 async function readSceneResponse(response: Response): Promise<ApiSceneResponse> {
@@ -167,6 +220,7 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [provider, setProviderState] = useState<ImageProvider>("openai");
+    const [direction, setDirection] = useState("");
 
     const setProvider = useCallback((next: ImageProvider) => {
       setProviderState(next);
@@ -262,6 +316,10 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         if (options?.select !== false && createdIds.length > 0) {
           editor.setSelectedShapes(createdIds);
         }
+
+        if (options?.autoAssignBase && createdIds.length > 0 && !findBaseImage(editor)) {
+          setBaseImage(editor, createdIds[0]);
+        }
       },
       [],
     );
@@ -282,7 +340,7 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
           })),
         );
 
-        await addImageDataUrls(items, options);
+        await addImageDataUrls(items, { autoAssignBase: true, ...options });
       },
       [addImageDataUrls, reportError],
     );
@@ -299,9 +357,9 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
 
       reportError(null);
 
-      let inputs: GenerationInput[] = [];
+      let collection: GenerationCollection;
       try {
-        inputs = await collectGenerationInputs(editor);
+        collection = await collectGenerationInputs(editor);
       } catch (caught) {
         reportError(
           caught instanceof Error
@@ -311,18 +369,35 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         return;
       }
 
-      if (inputs.length === 0) {
-        reportError("Select one or more images on the canvas before generating.");
+      const trimmedDirection = direction.trim();
+
+      if (!collection.base && collection.inspirations.length === 0) {
+        reportError(
+          "Pin a base image or select at least one inspiration before generating.",
+        );
         return;
       }
 
       const formData = new FormData();
       formData.append("provider", provider);
-      inputs.forEach((input, index) => {
-        formData.append("referenceImages", input.composite, `reference-${index}.png`);
-        input.textHints.forEach((hint) => {
-          formData.append("textHints", hint);
+      if (trimmedDirection) {
+        formData.append("direction", trimmedDirection);
+      }
+
+      if (collection.base) {
+        formData.append("baseImage", collection.base.composite, "base.png");
+        collection.base.textHints.forEach((hint) => {
+          formData.append("baseHints", hint);
         });
+      }
+
+      collection.inspirations.forEach((input, index) => {
+        formData.append(
+          "inspirationImages",
+          input.composite,
+          `inspiration-${index}.png`,
+        );
+        formData.append("inspirationHints", JSON.stringify(input.textHints));
       });
 
       setIsGenerating(true);
@@ -336,7 +411,7 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         const payload = await readSceneResponse(response);
         await addImageDataUrls(
           [{ dataUrl: payload.image, name: "Generated interior scene" }],
-          { select: true },
+          { select: true, autoAssignBase: false },
         );
       } catch (caught) {
         reportError(caught instanceof Error ? caught.message : "Generation failed.");
@@ -344,12 +419,13 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         setIsGenerating(false);
         setStatusMessage(null);
       }
-    }, [addImageDataUrls, isGenerating, provider, reportError]);
+    }, [addImageDataUrls, direction, isGenerating, provider, reportError]);
 
     useImperativeHandle(ref, () => ({ addFiles }), [addFiles]);
 
     const components: TLComponents = useMemo(
       () => ({
+        InFrontOfTheCanvas: () => <BaseImageBadge />,
         SharePanel: () => (
           <GenerateSharePanel
             isGenerating={isGenerating}
@@ -357,11 +433,21 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
             errorMessage={errorMessage}
             provider={provider}
             onProviderChange={setProvider}
+            direction={direction}
+            onDirectionChange={setDirection}
             onGenerate={runGeneration}
           />
         ),
       }),
-      [errorMessage, isGenerating, provider, runGeneration, setProvider, statusMessage],
+      [
+        direction,
+        errorMessage,
+        isGenerating,
+        provider,
+        runGeneration,
+        setProvider,
+        statusMessage,
+      ],
     );
 
     return (
@@ -416,12 +502,43 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
   },
 );
 
+function BaseImageBadge() {
+  const editor = useEditor();
+  const placement = useValue(
+    "base image badge placement",
+    () => {
+      const base = findBaseImage(editor);
+      if (!base) return null;
+      const bounds = editor.getShapePageBounds(base);
+      if (!bounds) return null;
+      const topLeft = editor.pageToViewport({ x: bounds.x, y: bounds.y });
+      return { x: topLeft.x, y: topLeft.y };
+    },
+    [editor],
+  );
+
+  if (!placement) return null;
+
+  return (
+    <div
+      className="base-badge"
+      style={{
+        transform: `translate(${placement.x}px, ${placement.y}px)`,
+      }}
+    >
+      Base
+    </div>
+  );
+}
+
 function GenerateSharePanel({
   isGenerating,
   statusMessage,
   errorMessage,
   provider,
   onProviderChange,
+  direction,
+  onDirectionChange,
   onGenerate,
 }: {
   isGenerating: boolean;
@@ -429,25 +546,54 @@ function GenerateSharePanel({
   errorMessage: string | null;
   provider: ImageProvider;
   onProviderChange: (next: ImageProvider) => void;
+  direction: string;
+  onDirectionChange: (next: string) => void;
   onGenerate: () => void;
 }) {
   const editor = useEditor();
-  const selectedImageCount = useValue(
-    "selected image count",
-    () => editor.getSelectedShapes().filter(isImageShape).length,
+
+  const summary = useValue(
+    "generation summary",
+    () => {
+      const base = findBaseImage(editor);
+      const selected = editor.getSelectedShapes().filter(isImageShape);
+      const selectedNonBase = selected.filter((s) => s.id !== base?.id);
+      const onlyOneSelected = selected.length === 1;
+      const singleSelected = onlyOneSelected ? selected[0] : null;
+      const singleSelectedIsBase = singleSelected
+        ? singleSelected.id === base?.id
+        : false;
+
+      return {
+        hasBase: Boolean(base),
+        baseId: base?.id ?? null,
+        inspirationCount: selectedNonBase.length,
+        canSetSelectedAsBase: Boolean(singleSelected) && !singleSelectedIsBase,
+        singleSelectedId: singleSelected?.id ?? null,
+      };
+    },
     [editor],
   );
 
-  const disabled = isGenerating || selectedImageCount === 0;
+  const canGenerate =
+    !isGenerating && (summary.hasBase || summary.inspirationCount > 0);
   const note = errorMessage ?? statusMessage;
 
   let label: string;
   if (isGenerating) {
     label = "Generating...";
-  } else if (selectedImageCount === 0) {
+  } else if (!summary.hasBase && summary.inspirationCount === 0) {
     label = "Generate";
+  } else if (summary.hasBase && summary.inspirationCount > 0) {
+    label = `Generate from base + ${summary.inspirationCount} inspiration${
+      summary.inspirationCount === 1 ? "" : "s"
+    }`;
+  } else if (summary.hasBase) {
+    label = "Generate from base";
   } else {
-    label = `Generate from ${selectedImageCount} image${selectedImageCount === 1 ? "" : "s"}`;
+    label = `Generate from ${summary.inspirationCount} inspiration${
+      summary.inspirationCount === 1 ? "" : "s"
+    }`;
   }
 
   return (
@@ -457,9 +603,7 @@ function GenerateSharePanel({
           <button
             key={option}
             type="button"
-            className={`tlui-button provider-toggle__option${
-              provider === option ? " provider-toggle__option--active" : ""
-            }`}
+            className={`tlui-button provider-toggle__option`}
             disabled={isGenerating}
             aria-pressed={provider === option}
             onClick={() => onProviderChange(option)}
@@ -468,14 +612,57 @@ function GenerateSharePanel({
           </button>
         ))}
       </div>
+
+      <div className="role-controls">
+        <span className="role-label">
+          Base: <strong>{summary.hasBase ? "set" : "none"}</strong>
+        </span>
+        {summary.canSetSelectedAsBase && summary.singleSelectedId ? (
+          <button
+            className="tlui-button role-button"
+            type="button"
+            disabled={isGenerating}
+            onClick={() => setBaseImage(editor, summary.singleSelectedId)}
+          >
+            <span className="tlui-button__label">Set as base</span>
+          </button>
+        ) : null}
+        {summary.hasBase ? (
+          <button
+            className="tlui-button role-button"
+            type="button"
+            disabled={isGenerating}
+            onClick={() => setBaseImage(editor, null)}
+          >
+            <span className="tlui-button__label">Clear base</span>
+          </button>
+        ) : null}
+      </div>
+
+      <input
+        className="direction-input"
+        type="text"
+        placeholder="Optional direction (e.g. cozy, evening light)"
+        value={direction}
+        disabled={isGenerating}
+        onChange={(event) => onDirectionChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && canGenerate) {
+            event.preventDefault();
+            onGenerate();
+          }
+        }}
+      />
+
       <button
         className="tlui-button tlui-button__primary generate-button"
         type="button"
-        disabled={disabled}
+        disabled={!canGenerate}
         onClick={onGenerate}
       >
         <span className="tlui-button__label">{label}</span>
       </button>
+
       {note ? (
         <div
           className={`generate-status${errorMessage ? " generate-status--error" : ""}`}

@@ -75,76 +75,125 @@ export function extractImageFromResponse(response: unknown): GeneratedImageResul
   };
 }
 
-function buildPrompt(textHints: string[]) {
-  const promptLines = [
-    "You are an interior designer generating a coherent photorealistic room concept.",
-    "Each reference image already contains visual annotations drawn on top of it: brush strokes, highlights, arrows, shapes, and short text notes are design directives the user wants you to honor in those exact regions (for example, a brush over a pillow with the note 'make it red' means recolor that pillow red).",
-    "Treat the underlying photo as the source of truth for geometry, perspective, and unmarked areas. Apply the annotations as targeted edits, ignoring the marks themselves visually but acting on the intent they convey.",
-    "When multiple references are provided, synthesize them into a single coherent scene; respect floor plans or room structure where present and let style/material/furniture references guide the rest.",
-  ];
+export type SceneReference = {
+  image: File | string;
+  hints: string[];
+};
 
-  if (textHints.length > 0) {
-    promptLines.push(
-      "Explicit textual notes from the canvas (treat as additional directives for the corresponding annotated regions):",
-      ...textHints.map((hint, index) => `${index + 1}. ${hint}`),
-    );
-  }
-
-  return promptLines.join("\n");
-}
-
-export async function generateScene({
-  provider,
-  referenceImages,
-  textHints = [],
-  quality,
-}: {
+export type SceneRequest = {
   provider: ImageProvider;
-  referenceImages: Array<File | string>;
-  textHints?: string[];
   quality: ImageQuality;
-}) {
-  if (provider === "gemini") {
-    return generateSceneWithGemini({ referenceImages, textHints });
-  }
+  base?: SceneReference | null;
+  inspirations?: SceneReference[];
+  direction?: string;
+};
 
-  return generateSceneWithOpenAI({ referenceImages, textHints, quality });
+const SYSTEM_PREAMBLE =
+  "You are an interior designer producing a single new photorealistic interior scene. Read every text block before its associated image carefully — text blocks describe how to use the image that immediately follows them. Items drawn or written directly on top of any image (brush strokes, highlights, arrows, short text notes) are targeted design directives for that exact region; do not depict the marks themselves in the output, but apply the intent they convey.";
+
+const BASE_INSTRUCTIONS =
+  "BASE IMAGE — the room to redesign. PRESERVE its geometry, walls, windows, doors, ceiling height, perspective, camera angle, daylight direction, and overall layout. Treat any annotations on this image as targeted edits to apply in those specific regions.";
+
+const INSPIRATION_INSTRUCTIONS =
+  "STYLE INSPIRATIONS — borrow ONLY their aesthetic, color palette, materials, finishes, lighting mood, furniture silhouettes, and decor language. Do NOT copy their geometry, layout, perspective, or specific room contents. Annotations on an inspiration image highlight the qualities the user wants borrowed.";
+
+const STYLE_ONLY_INSTRUCTIONS =
+  "No base room was provided. Synthesize a new coherent interior scene that captures the combined aesthetic of the inspirations.";
+
+const FINAL_INSTRUCTIONS =
+  "Produce a single new photorealistic interior scene that satisfies the directives above. Do not render the annotation marks themselves in the output.";
+
+function formatHintsBlock(label: string, hints: string[]): string | null {
+  if (hints.length === 0) return null;
+  return [
+    `${label}:`,
+    ...hints.map((hint, index) => `  ${index + 1}. ${hint}`),
+  ].join("\n");
 }
 
-async function generateSceneWithOpenAI({
-  referenceImages,
-  textHints,
-  quality,
-}: {
-  referenceImages: Array<File | string>;
-  textHints: string[];
-  quality: ImageQuality;
-}) {
+export async function generateScene(request: SceneRequest) {
+  const inspirations = request.inspirations ?? [];
+
+  if (!request.base && inspirations.length === 0) {
+    throw new Error("Provide a base image or at least one inspiration.");
+  }
+
+  if (request.provider === "gemini") {
+    return generateSceneWithGemini(request);
+  }
+
+  return generateSceneWithOpenAI(request);
+}
+
+type OpenAIContentPart =
+  | { type: "input_text"; text: string }
+  | { type: "input_image"; image_url: string; detail: "high" };
+
+async function buildOpenAIContent(request: SceneRequest): Promise<OpenAIContentPart[]> {
+  const inspirations = request.inspirations ?? [];
+  const parts: OpenAIContentPart[] = [{ type: "input_text", text: SYSTEM_PREAMBLE }];
+
+  if (request.base) {
+    const text = [BASE_INSTRUCTIONS, formatHintsBlock("Annotations on the base", request.base.hints)]
+      .filter(Boolean)
+      .join("\n");
+    parts.push({ type: "input_text", text });
+    parts.push({
+      type: "input_image",
+      image_url:
+        request.base.image instanceof File
+          ? await fileToDataUrl(request.base.image)
+          : request.base.image,
+      detail: "high",
+    });
+  }
+
+  if (inspirations.length > 0) {
+    parts.push({
+      type: "input_text",
+      text: request.base ? INSPIRATION_INSTRUCTIONS : STYLE_ONLY_INSTRUCTIONS,
+    });
+
+    for (const [index, inspiration] of inspirations.entries()) {
+      const headerLines = [`Inspiration #${index + 1}:`];
+      const hintBlock = formatHintsBlock("What to borrow", inspiration.hints);
+      if (hintBlock) headerLines.push(hintBlock);
+      parts.push({ type: "input_text", text: headerLines.join("\n") });
+      parts.push({
+        type: "input_image",
+        image_url:
+          inspiration.image instanceof File
+            ? await fileToDataUrl(inspiration.image)
+            : inspiration.image,
+        detail: "high",
+      });
+    }
+  }
+
+  if (request.direction && request.direction.trim()) {
+    parts.push({
+      type: "input_text",
+      text: `USER DIRECTION (overarching guidance): ${request.direction.trim()}`,
+    });
+  }
+
+  parts.push({ type: "input_text", text: FINAL_INSTRUCTIONS });
+
+  return parts;
+}
+
+async function generateSceneWithOpenAI(request: SceneRequest) {
   const openai = getOpenAIClient();
-  const referenceInputs = await Promise.all(
-    referenceImages.map(async (image) => ({
-      type: "input_image" as const,
-      image_url: image instanceof File ? await fileToDataUrl(image) : image,
-      detail: "high" as const,
-    })),
-  );
+  const content = await buildOpenAIContent(request);
 
   const response = await openai.responses.create({
     model: "gpt-5.5",
-    input: [
-      {
-        role: "user",
-        content: [
-          { type: "input_text", text: buildPrompt(textHints) },
-          ...referenceInputs,
-        ],
-      },
-    ],
+    input: [{ role: "user", content }],
     tools: [
       {
         type: "image_generation",
         action: "generate",
-        quality,
+        quality: request.quality,
         size: "1536x1024",
         output_format: "png",
       },
@@ -176,35 +225,63 @@ async function referenceToInlineData(image: File | string) {
   return { mimeType, data: buffer.toString("base64") };
 }
 
-async function generateSceneWithGemini({
-  referenceImages,
-  textHints,
-}: {
-  referenceImages: Array<File | string>;
-  textHints: string[];
-}): Promise<GeneratedImageResult> {
+type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
+async function buildGeminiParts(request: SceneRequest): Promise<GeminiPart[]> {
+  const inspirations = request.inspirations ?? [];
+  const parts: GeminiPart[] = [{ text: SYSTEM_PREAMBLE }];
+
+  if (request.base) {
+    const text = [BASE_INSTRUCTIONS, formatHintsBlock("Annotations on the base", request.base.hints)]
+      .filter(Boolean)
+      .join("\n");
+    parts.push({ text });
+    parts.push({ inlineData: await referenceToInlineData(request.base.image) });
+  }
+
+  if (inspirations.length > 0) {
+    parts.push({
+      text: request.base ? INSPIRATION_INSTRUCTIONS : STYLE_ONLY_INSTRUCTIONS,
+    });
+
+    for (const [index, inspiration] of inspirations.entries()) {
+      const headerLines = [`Inspiration #${index + 1}:`];
+      const hintBlock = formatHintsBlock("What to borrow", inspiration.hints);
+      if (hintBlock) headerLines.push(hintBlock);
+      parts.push({ text: headerLines.join("\n") });
+      parts.push({ inlineData: await referenceToInlineData(inspiration.image) });
+    }
+  }
+
+  if (request.direction && request.direction.trim()) {
+    parts.push({
+      text: `USER DIRECTION (overarching guidance): ${request.direction.trim()}`,
+    });
+  }
+
+  parts.push({ text: FINAL_INSTRUCTIONS });
+
+  return parts;
+}
+
+async function generateSceneWithGemini(
+  request: SceneRequest,
+): Promise<GeneratedImageResult> {
   const ai = getGeminiClient();
-  const inlineParts = await Promise.all(
-    referenceImages.map(async (image) => ({
-      inlineData: await referenceToInlineData(image),
-    })),
-  );
+  const parts = await buildGeminiParts(request);
 
   const response = await ai.models.generateContent({
     model: "gemini-3.1-flash-image-preview",
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: buildPrompt(textHints) }, ...inlineParts],
-      },
-    ],
+    contents: [{ role: "user", parts }],
   });
 
-  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  const responseParts = response.candidates?.[0]?.content?.parts ?? [];
   let imageBase64: string | undefined;
   let revisedPrompt: string | undefined;
 
-  for (const part of parts) {
+  for (const part of responseParts) {
     if (part.inlineData?.data && !imageBase64) {
       imageBase64 = part.inlineData.data;
     } else if (part.text && !revisedPrompt) {
