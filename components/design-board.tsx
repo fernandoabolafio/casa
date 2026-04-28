@@ -43,6 +43,7 @@ const PLACEHOLDER_H = 320;
 const PLACEHOLDER_OFFSET_STEP = 36;
 
 const customShapeUtils = [GenerationPlaceholderShapeUtil];
+const TLDRAW_LICENSE_KEY = process.env.NEXT_PUBLIC_TLDRAW_LICENSE_KEY;
 
 type AddImageOptions = {
   point?: VecLike;
@@ -723,6 +724,7 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
       >
         <Tldraw
           autoFocus
+          licenseKey={TLDRAW_LICENSE_KEY}
           persistenceKey="casa-design-board"
           shapeUtils={customShapeUtils}
           components={components}
