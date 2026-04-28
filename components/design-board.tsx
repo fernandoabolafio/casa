@@ -32,6 +32,7 @@ import {
 import type { ApiSceneResponse, ImageProvider } from "@/lib/types";
 
 const PROVIDER_STORAGE_KEY = "casa.imageProvider";
+const ONBOARDING_STORAGE_KEY = "casa.onboardingDismissed";
 
 const PROVIDER_LABELS: Record<ImageProvider, string> = {
   openai: "OpenAI",
@@ -350,6 +351,34 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
     const [isDraggingOver, setIsDraggingOver] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [provider, setProviderState] = useState<ImageProvider>("openai");
+    const [providerAvailability, setProviderAvailability] = useState<
+      Record<ImageProvider, boolean>
+    >({ openai: true, gemini: true });
+    const [onboardingDismissed, setOnboardingDismissed] = useState(true);
+    const [onboardingForceOpen, setOnboardingForceOpen] = useState(false);
+
+    useEffect(() => {
+      try {
+        const stored = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+        setOnboardingDismissed(stored === "1");
+      } catch {
+        setOnboardingDismissed(false);
+      }
+    }, []);
+
+    const dismissOnboarding = useCallback(() => {
+      setOnboardingDismissed(true);
+      setOnboardingForceOpen(false);
+      try {
+        window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
+      } catch {
+        // ignore
+      }
+    }, []);
+
+    const showOnboardingTips = useCallback(() => {
+      setOnboardingForceOpen(true);
+    }, []);
 
     const setProvider = useCallback((next: ImageProvider) => {
       setProviderState(next);
@@ -371,6 +400,27 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
       } catch {
         // ignore
       }
+    }, []);
+
+    useEffect(() => {
+      const controller = new AbortController();
+      fetch("/api/providers", { signal: controller.signal })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: Record<ImageProvider, boolean> | null) => {
+          if (!data) return;
+          setProviderAvailability(data);
+          setProviderState((current) => {
+            if (data[current]) return current;
+            const fallback = (Object.keys(data) as ImageProvider[]).find(
+              (key) => data[key],
+            );
+            return fallback ?? current;
+          });
+        })
+        .catch(() => {
+          // ignore — keep buttons enabled if the check fails
+        });
+      return () => controller.abort();
     }, []);
 
     useEffect(() => {
@@ -678,18 +728,39 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
 
     const components: TLComponents = useMemo(
       () => ({
-        InFrontOfTheCanvas: () => <RoleBadges />,
+        InFrontOfTheCanvas: () => (
+          <>
+            <RoleBadges />
+            <BoardOnboarding
+              dismissed={onboardingDismissed}
+              forceOpen={onboardingForceOpen}
+              onDismiss={dismissOnboarding}
+            />
+          </>
+        ),
         SharePanel: () => (
           <GenerateSharePanel
             errorMessage={errorMessage}
             provider={provider}
+            providerAvailability={providerAvailability}
             onProviderChange={setProvider}
             directionRef={directionRef}
             onGenerate={enqueueGeneration}
+            onShowTips={showOnboardingTips}
           />
         ),
       }),
-      [enqueueGeneration, errorMessage, provider, setProvider],
+      [
+        dismissOnboarding,
+        enqueueGeneration,
+        errorMessage,
+        onboardingDismissed,
+        onboardingForceOpen,
+        provider,
+        providerAvailability,
+        setProvider,
+        showOnboardingTips,
+      ],
     );
 
     return (
@@ -778,18 +849,98 @@ function RoleBadges() {
   );
 }
 
+function BoardOnboarding({
+  dismissed,
+  forceOpen,
+  onDismiss,
+}: {
+  dismissed: boolean;
+  forceOpen: boolean;
+  onDismiss: () => void;
+}) {
+  const editor = useEditor();
+  const isEmpty = useValue(
+    "board is empty",
+    () => editor.getCurrentPageShapes().length === 0,
+    [editor],
+  );
+
+  const visible = forceOpen || (isEmpty && !dismissed);
+  if (!visible) return null;
+
+  return (
+    <div className="onboarding-overlay" role="dialog" aria-label="Welcome to Casa">
+      <div
+        className="onboarding-card"
+        onPointerDown={(event) => event.stopPropagation()}
+        onWheel={(event) => event.stopPropagation()}
+      >
+        <header className="onboarding-card__header">
+          <h2 className="onboarding-card__title">Welcome to Casa</h2>
+          <p className="onboarding-card__subtitle">
+            Drop in a few photos and remix your space with AI.
+          </p>
+        </header>
+        <ol className="onboarding-steps">
+          <li>
+            <strong>Add images.</strong> Drag &amp; drop photos onto the canvas, or
+            paste them from your clipboard. Tldraw&apos;s built-in upload also
+            works for picking files.
+          </li>
+          <li>
+            <strong>Mark roles.</strong> Select an image and use{" "}
+            <em>Mark as base</em> in the top-right panel to set the room you want
+            to redesign. Optionally pick reference images and tag them with{" "}
+            <em>Mark as reference</em>. Anything else selected stays as
+            inspiration.
+          </li>
+          <li>
+            <strong>Describe the change.</strong> Type an optional direction
+            (e.g. <em>cozy, evening light</em>) in the panel input.
+          </li>
+          <li>
+            <strong>Generate.</strong> Click the primary button — its label
+            reflects what will happen (e.g. <em>Generate from base + 2
+            inspirations</em>).
+          </li>
+          <li>
+            <strong>Switch model.</strong> Toggle <em>OpenAI</em> /{" "}
+            <em>Gemini</em> at the top of the same panel any time.
+          </li>
+        </ol>
+        <p className="onboarding-card__hint">
+          Tip: drop your first photo anywhere on this canvas to get started.
+        </p>
+        <div className="onboarding-card__actions">
+          <button
+            type="button"
+            className="tlui-button tlui-button__primary onboarding-card__cta"
+            onClick={onDismiss}
+          >
+            <span className="tlui-button__label">Got it</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GenerateSharePanel({
   errorMessage,
   provider,
+  providerAvailability,
   onProviderChange,
   directionRef,
   onGenerate,
+  onShowTips,
 }: {
   errorMessage: string | null;
   provider: ImageProvider;
+  providerAvailability: Record<ImageProvider, boolean>;
   onProviderChange: (next: ImageProvider) => void;
   directionRef: React.MutableRefObject<string>;
   onGenerate: () => void;
+  onShowTips: () => void;
 }) {
   const editor = useEditor();
   const [direction, setDirection] = useState(directionRef.current);
@@ -890,18 +1041,44 @@ function GenerateSharePanel({
 
   return (
     <div className="generate-share-panel">
-      <div className="provider-toggle" role="group" aria-label="Image model provider">
-        {(Object.keys(PROVIDER_LABELS) as ImageProvider[]).map((option) => (
-          <button
-            key={option}
-            type="button"
-            className={`tlui-button provider-toggle__option`}
-            aria-pressed={provider === option}
-            onClick={() => onProviderChange(option)}
-          >
-            <span className="tlui-button__label">{PROVIDER_LABELS[option]}</span>
-          </button>
-        ))}
+      <div className="generate-share-panel__top">
+        <div
+          className="provider-toggle"
+          role="group"
+          aria-label="Image model provider"
+        >
+          {(Object.keys(PROVIDER_LABELS) as ImageProvider[]).map((option) => {
+          const available = providerAvailability[option];
+          return (
+            <button
+              key={option}
+              type="button"
+              className={`tlui-button provider-toggle__option`}
+              aria-pressed={provider === option}
+              disabled={!available}
+              title={
+                available
+                  ? undefined
+                  : `${PROVIDER_LABELS[option]} API key not configured on the server`
+              }
+              onClick={() => onProviderChange(option)}
+            >
+              <span className="tlui-button__label">
+                {PROVIDER_LABELS[option]}
+                {available ? "" : " (no key)"}
+              </span>
+            </button>
+          );
+        })}
+        </div>
+        <button
+          type="button"
+          className="tlui-button onboarding-tips-button"
+          onClick={onShowTips}
+          title="Show onboarding tips"
+        >
+          <span className="tlui-button__label">Tips</span>
+        </button>
       </div>
 
       <div className="role-controls">

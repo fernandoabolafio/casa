@@ -279,3 +279,122 @@ a {
     transform: rotate(360deg);
   }
 }
+
+.generate-share-panel__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.generate-share-panel__top .provider-toggle {
+  flex: 1;
+}
+
+.onboarding-tips-button.tlui-button {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--tl-color-low);
+  border: 1px solid var(--tl-color-low-border);
+  color: var(--tl-color-text-1);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.onboarding-tips-button.tlui-button:hover {
+  background: var(--tl-color-muted-2);
+}
+
+.onboarding-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.onboarding-card {
+  pointer-events: auto;
+  max-width: 480px;
+  width: 100%;
+  padding: 22px 24px 18px;
+  border-radius: 16px;
+  background: var(--tl-color-panel, #1d1a15);
+  border: 1px solid var(--tl-color-low-border);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+  color: var(--tl-color-text, var(--text));
+}
+
+.onboarding-card__header {
+  margin-bottom: 12px;
+}
+
+.onboarding-card__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.onboarding-card__subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--tl-color-text-1, var(--muted));
+}
+
+.onboarding-steps {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tl-color-text, var(--text));
+}
+
+.onboarding-steps li {
+  margin-bottom: 8px;
+}
+
+.onboarding-steps li:last-child {
+  margin-bottom: 0;
+}
+
+.onboarding-steps strong {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.onboarding-steps em {
+  font-style: normal;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--tl-color-low);
+  border: 1px solid var(--tl-color-low-border);
+  font-size: 12px;
+}
+
+.onboarding-card__hint {
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--tl-color-low);
+  font-size: 12px;
+  color: var(--tl-color-text-1);
+  line-height: 1.4;
+}
+
+.onboarding-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.onboarding-card__cta.tlui-button {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-weight: 600;
+}

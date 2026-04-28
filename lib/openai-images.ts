@@ -95,6 +95,9 @@ const SYSTEM_PREAMBLE =
 const BASE_INSTRUCTIONS =
   "BASE IMAGE — the room to redesign. PRESERVE its room structure: geometry, walls, windows, doors, ceiling height, perspective, camera angle, daylight direction, and overall layout. Treat walls, windows, doors, openings, ceiling lines, and other architectural elements as locked to the base scene unless the user explicitly instructs a structural change. Treat any annotations on this image as targeted edits to apply in those specific regions.";
 
+const BASE_ONLY_AMENDMENT =
+  "MINIMAL-EDIT MODE — no design references or inspirations were provided, only this base image. Treat the base as a near-final scene and change ONLY what the annotations on the base unambiguously direct you to change, plus anything explicitly requested in the USER DIRECTION (if any). Do NOT restyle, recolor, relight, redecorate, reorganize, or substitute any other element. Every wall, ceiling, floor, window treatment, piece of furniture, textile, decor item, plant, lamp, artwork, hardware finish, and lighting condition that is NOT directly targeted by an annotation or by the user direction must be reproduced as faithfully as possible — same colors, same materials, same positions, same proportions, same camera framing. When in doubt about whether something should change, leave it exactly as it is in the base.";
+
 const BASE_EXTEND_AMENDMENT =
   "EXTEND MODE — the base shows a DIFFERENT CAMERA ANGLE / VIEWPOINT of the SAME PHYSICAL ROOM that appears in the design references below. Preserve the base's geometry, perspective, and which surfaces are visible from this angle, but identify which walls, floor sections, doors, windows, and pieces of furniture in the base correspond to those in the references and finish them IDENTICALLY (same paint color, same wood tone, same upholstery, same materials, same lighting temperature). Out-of-frame elements that are present in references but not in this base view should be omitted; new elements visible from this angle that are absent from the references should be inferred coherently with the established design.";
 
@@ -158,6 +161,7 @@ async function buildOpenAIContent(request: SceneRequest): Promise<OpenAIContentP
   if (request.base) {
     const baseLines = [BASE_INSTRUCTIONS];
     if (hasReferences) baseLines.push(BASE_EXTEND_AMENDMENT);
+    if (!hasReferences && inspirations.length === 0) baseLines.push(BASE_ONLY_AMENDMENT);
     const hintBlock = formatHintsBlock("Annotations on the base", request.base.hints);
     if (hintBlock) baseLines.push(hintBlock);
     parts.push({ type: "input_text", text: baseLines.join("\n\n") });
@@ -262,6 +266,7 @@ async function buildGeminiParts(request: SceneRequest): Promise<GeminiPart[]> {
   if (request.base) {
     const baseLines = [BASE_INSTRUCTIONS];
     if (hasReferences) baseLines.push(BASE_EXTEND_AMENDMENT);
+    if (!hasReferences && inspirations.length === 0) baseLines.push(BASE_ONLY_AMENDMENT);
     const hintBlock = formatHintsBlock("Annotations on the base", request.base.hints);
     if (hintBlock) baseLines.push(hintBlock);
     parts.push({ text: baseLines.join("\n\n") });
