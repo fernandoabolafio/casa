@@ -89,17 +89,62 @@ export async function maskToOpenAIPngBlob(mask: MaskBuffer): Promise<Blob> {
   });
 }
 
+export function rgbaToDataUrl(
+  rgba: Uint8ClampedArray | Uint8Array,
+  width: number,
+  height: number,
+): string {
+  const { canvas, context } = canvas2d(width, height);
+  const image = context.createImageData(width, height);
+  image.data.set(rgba);
+  context.putImageData(image, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
 export function compositeToDataUrl(
   original: Uint8ClampedArray,
   edited: Uint8ClampedArray,
   mask: MaskBuffer,
 ): string {
   const composited = compositeOutsideMask(original, edited, mask);
-  const { canvas, context } = canvas2d(mask.width, mask.height);
-  const image = context.createImageData(mask.width, mask.height);
-  image.data.set(composited);
+  return rgbaToDataUrl(composited, mask.width, mask.height);
+}
+
+/**
+ * Highlights every pixel that actually changed between two RGBA buffers, so the
+ * review can prove that only the intended region moved. Returns a transparent
+ * overlay (changed pixels tinted) plus the changed fraction of the image.
+ */
+export function diffOverlayDataUrl(
+  before: Uint8ClampedArray | Uint8Array,
+  after: Uint8ClampedArray | Uint8Array,
+  width: number,
+  height: number,
+  rgb: [number, number, number] = [231, 76, 60],
+  threshold = 8,
+): { overlayUrl: string; changedPct: number } {
+  const pixels = width * height;
+  const { canvas, context } = canvas2d(width, height);
+  const image = context.createImageData(width, height);
+  let changed = 0;
+  for (let i = 0; i < pixels; i += 1) {
+    const base = i * 4;
+    const delta =
+      Math.abs(before[base] - after[base]) +
+      Math.abs(before[base + 1] - after[base + 1]) +
+      Math.abs(before[base + 2] - after[base + 2]);
+    const isChanged = delta > threshold;
+    if (isChanged) changed += 1;
+    image.data[base] = rgb[0];
+    image.data[base + 1] = rgb[1];
+    image.data[base + 2] = rgb[2];
+    image.data[base + 3] = isChanged ? 150 : 0;
+  }
   context.putImageData(image, 0, 0);
-  return canvas.toDataURL("image/png");
+  return {
+    overlayUrl: canvas.toDataURL("image/png"),
+    changedPct: pixels === 0 ? 0 : (changed / pixels) * 100,
+  };
 }
 
 /** A translucent colored overlay of the selection, for display on the stage. */

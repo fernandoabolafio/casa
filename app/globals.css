@@ -396,6 +396,27 @@ select {
   left: 0;
 }
 
+.ocr__compare-diff {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.ocr__review-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ocr__trust {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .ocr__compare-divider {
   position: absolute;
   top: 0;

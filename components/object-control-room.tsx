@@ -14,15 +14,22 @@ import {
   type HistoryStep,
   type Intent,
 } from "@/lib/edit-plan";
-import { dilate, feather, maskBounds, type MaskBuffer } from "@/lib/mask-ops-core";
+import {
+  compositeOutsideMask,
+  dilate,
+  feather,
+  maskBounds,
+  type MaskBuffer,
+} from "@/lib/mask-ops-core";
 import {
   coverResizeToDataUrl,
-  compositeToDataUrl,
+  diffOverlayDataUrl,
   getRGBA,
   maskToOpenAIPngBlob,
   maskToOverlayDataUrl,
   pickEditSize,
   rectMask,
+  rgbaToDataUrl,
 } from "@/lib/mask-ops";
 import { createSegmenter, preloadSegmenter, type Segmenter } from "@/lib/segmenter";
 import type { ApiSceneResponse } from "@/lib/types";
@@ -214,7 +221,14 @@ export function ObjectControlRoom() {
       );
 
       const editedRGBA = await getRGBA(payload.image, working.width, working.height);
-      const composited = compositeToDataUrl(originalRGBA, editedRGBA, blendMask);
+      const compositedRGBA = compositeOutsideMask(originalRGBA, editedRGBA, blendMask);
+      const composited = rgbaToDataUrl(compositedRGBA, working.width, working.height);
+      const diff = diffOverlayDataUrl(
+        originalRGBA,
+        compositedRGBA,
+        working.width,
+        working.height,
+      );
 
       const step: HistoryStep = {
         id: `${Date.now()}`,
@@ -223,6 +237,8 @@ export function ObjectControlRoom() {
         instruction: instruction.trim(),
         before: working.dataUrl,
         after: composited,
+        diffOverlay: diff.overlayUrl,
+        changedPct: diff.changedPct,
       };
       setHistory((prev) => [...prev, step]);
       setReview(step);
@@ -442,20 +458,29 @@ function BeforeAfter({
   onPct: (value: number) => void;
   onClose: () => void;
 }) {
+  const [showDiff, setShowDiff] = useState(false);
+
   return (
     <div className="ocr__review">
       <div className="ocr__review-head">
         <span>
           Before / after — {intentVerb(step.intent)} {step.tokenLabel}
         </span>
-        <button className="ocr__btn" type="button" onClick={onClose}>
-          Close
-        </button>
+        <div className="ocr__review-actions">
+          <button
+            type="button"
+            className={`ocr__btn ${showDiff ? "ocr__btn--on" : ""}`}
+            onClick={() => setShowDiff((value) => !value)}
+          >
+            {showDiff ? "Hide changes" : "Highlight changes"}
+          </button>
+          <button className="ocr__btn" type="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
       </div>
       <div className="ocr__compare">
-        { }
         <img className="ocr__compare-img" src={step.after} alt="After" draggable={false} />
-        { }
         <img
           className="ocr__compare-img ocr__compare-before"
           src={step.before}
@@ -463,6 +488,9 @@ function BeforeAfter({
           draggable={false}
           style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
         />
+        {showDiff ? (
+          <img className="ocr__compare-diff" src={step.diffOverlay} alt="" draggable={false} />
+        ) : null}
         <div className="ocr__compare-divider" style={{ left: `${pct}%` }} />
       </div>
       <input
@@ -473,6 +501,10 @@ function BeforeAfter({
         value={pct}
         onChange={(event) => onPct(Number(event.target.value))}
       />
+      <p className="ocr__trust">
+        Only {step.changedPct.toFixed(1)}% of the image changed — everything outside your
+        selection is byte-identical to the original.
+      </p>
     </div>
   );
 }

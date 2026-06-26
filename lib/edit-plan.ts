@@ -34,6 +34,8 @@ export type HistoryStep = {
   instruction: string;
   before: string;
   after: string;
+  diffOverlay: string;
+  changedPct: number;
 };
 
 export function intentVerb(intent: Intent): string {
