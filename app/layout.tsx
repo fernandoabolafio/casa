@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import "tldraw/tldraw.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Casa Home Design",
-  description: "Canvas-based AI home design exploration.",
+  description: "Object-first AI interior redesign.",
 };
 
 export default function RootLayout({

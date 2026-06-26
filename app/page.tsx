@@ -1,11 +1,9 @@
-"use client";
-
-import { DesignBoard } from "@/components/design-board";
+import { ObjectControlRoom } from "@/components/object-control-room";
 
 export default function Home() {
   return (
     <main className="studio-shell">
-      <DesignBoard />
+      <ObjectControlRoom />
     </main>
   );
 }

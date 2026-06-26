@@ -4,6 +4,9 @@ import { z } from "zod";
 
 export const qualitySchema = z.enum(["low", "medium", "high", "auto"]);
 export const providerSchema = z.enum(["openai", "gemini"]);
+export const editSizeSchema = z.enum(["1024x1024", "1536x1024", "1024x1536"]);
+
+export type EditSize = z.infer<typeof editSizeSchema>;
 
 export type ImageProvider = z.infer<typeof providerSchema>;
 
@@ -348,29 +351,30 @@ async function generateSceneWithGemini(
   };
 }
 
-export async function editScene({
+export async function editRegion({
   sceneDataUrl,
   mask,
-  instructions,
+  instruction,
   quality,
+  size,
 }: {
   sceneDataUrl: string;
   mask: File;
-  instructions: string[];
+  instruction: string;
   quality: ImageQuality;
+  size: EditSize;
 }) {
   const openai = getOpenAIClient();
   const scene = dataUrlToBuffer(sceneDataUrl);
-  const sceneFile = await toFile(scene.buffer, "current-scene.png", {
-    type: scene.mimeType,
-  });
+  const sceneFile = await toFile(scene.buffer, "scene.png", { type: scene.mimeType });
   const maskFile = await toFile(Buffer.from(await mask.arrayBuffer()), "mask.png", {
     type: "image/png",
   });
+
   const prompt = [
-    "Apply the following interior design refinements to the brushed region.",
-    "Keep the room geometry, perspective, lighting direction, and unmasked areas as consistent as possible.",
-    ...instructions.map((instruction, index) => `${index + 1}. ${instruction}`),
+    "You are editing one selected object in an interior photo. Only the transparent region of the mask may change.",
+    "Keep the room geometry, camera angle, perspective, lighting direction, and every unmasked pixel exactly as they are.",
+    instruction,
   ].join("\n");
 
   const response = await openai.images.edit({
@@ -379,12 +383,11 @@ export async function editScene({
     mask: maskFile,
     prompt,
     quality,
-    size: "1536x1024",
+    size,
     output_format: "png",
   });
 
   const imageBase64 = response.data?.[0]?.b64_json;
-
   if (!imageBase64) {
     throw new Error("OpenAI did not return an edited image.");
   }
