@@ -77,6 +77,26 @@ select {
   line-height: 1.5;
 }
 
+.ocr-upload__sample {
+  margin-top: 12px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ocr-upload__sample:hover {
+  border-color: var(--accent);
+}
+
+.ocr-upload__sample:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .ocr-upload__status {
   margin: 16px 0 0;
   font-size: 12px;

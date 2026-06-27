@@ -51,6 +51,10 @@ async function loadModel(): Promise<LoadedModel> {
       const model = await transformers.SamModel.from_pretrained(MODEL_ID, {
         dtype,
         device,
+        // onnxruntime logs a benign "nodes not assigned to preferred EP"
+        // warning via console.error; raise the severity so it stays quiet
+        // (and doesn't trip the Next.js dev error overlay).
+        session_options: { logSeverityLevel: 3 },
       });
       const processor = await transformers.AutoProcessor.from_pretrained(MODEL_ID);
       return {
@@ -78,25 +82,31 @@ export async function preloadSegmenter(): Promise<void> {
 
 export function createSegmenter(): Segmenter {
   let prepared: PreparedImage | null = null;
+  let preparePromise: Promise<void> | null = null;
 
   return {
-    async prepare(dataUrl: string) {
-      const { model, processor, RawImage } = await loadModel();
-      const image = await RawImage.read(dataUrl);
-      const inputs = await processor(image);
-      const embeddings = await (model as unknown as SamRuntimeModel).get_image_embeddings(
-        inputs,
-      );
-      prepared = {
-        embeddings: embeddings as Record<string, unknown>,
-        originalSizes: (inputs as { original_sizes: number[][] }).original_sizes,
-        reshapedSizes: (inputs as { reshaped_input_sizes: number[][] }).reshaped_input_sizes,
-        width: image.width,
-        height: image.height,
-      };
+    prepare(dataUrl: string) {
+      preparePromise = (async () => {
+        const { model, processor, RawImage } = await loadModel();
+        const image = await RawImage.read(dataUrl);
+        const inputs = await processor(image);
+        const embeddings = await (model as unknown as SamRuntimeModel).get_image_embeddings(
+          inputs,
+        );
+        prepared = {
+          embeddings: embeddings as Record<string, unknown>,
+          originalSizes: (inputs as { original_sizes: number[][] }).original_sizes,
+          reshapedSizes: (inputs as { reshaped_input_sizes: number[][] }).reshaped_input_sizes,
+          width: image.width,
+          height: image.height,
+        };
+      })();
+      return preparePromise;
     },
 
     async segmentAtPoint(normX: number, normY: number) {
+      // Tolerate clicks that arrive while embeddings are still being computed.
+      if (preparePromise) await preparePromise;
       if (!prepared) {
         throw new Error("Segmenter image is not prepared yet.");
       }

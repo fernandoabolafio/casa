@@ -75,6 +75,7 @@ export function ObjectControlRoom() {
 
   const segmenterRef = useRef<Segmenter | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const boxStartRef = useRef<{
     normX: number;
     normY: number;
@@ -132,9 +133,13 @@ export function ObjectControlRoom() {
 
   const stageToWorking = useCallback(
     (clientX: number, clientY: number) => {
-      const stage = stageRef.current;
-      if (!stage || !working) return null;
-      const rect = stage.getBoundingClientRect();
+      const image = imageRef.current;
+      if (!image || !working) return null;
+      // Map against the rendered image rect, not the stage: the image is
+      // letterboxed and centered inside the padded stage, so using the stage
+      // rect would send the wrong point to the segmenter.
+      const rect = image.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return null;
       const normX = (clientX - rect.left) / rect.width;
       const normY = (clientY - rect.top) / rect.height;
       if (normX < 0 || normX > 1 || normY < 0 || normY > 1) return null;
@@ -304,7 +309,13 @@ export function ObjectControlRoom() {
           onPointerUp={handleStagePointerUp}
         >
           { }
-          <img className="ocr__image" src={working.dataUrl} alt="Room being edited" draggable={false} />
+          <img
+            ref={imageRef}
+            className="ocr__image"
+            src={working.dataUrl}
+            alt="Room being edited"
+            draggable={false}
+          />
           {overlayUrl ? (
              
             <img className="ocr__overlay" src={overlayUrl} alt="" draggable={false} />
@@ -520,6 +531,19 @@ function UploadScreen({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [loadingSample, setLoadingSample] = useState(false);
+
+  const loadSample = useCallback(async () => {
+    setLoadingSample(true);
+    try {
+      const response = await fetch("/sample-room.png");
+      if (!response.ok) throw new Error("Could not load the sample room.");
+      const blob = await response.blob();
+      onFile(new File([blob], "sample-room.png", { type: "image/png" }));
+    } catch {
+      setLoadingSample(false);
+    }
+  }, [onFile]);
 
   return (
     <div className="ocr-upload">
@@ -544,6 +568,17 @@ function UploadScreen({
         </p>
         <button className="ocr__apply" type="button">
           Choose photo
+        </button>
+        <button
+          className="ocr-upload__sample"
+          type="button"
+          disabled={loadingSample}
+          onClick={(event) => {
+            event.stopPropagation();
+            void loadSample();
+          }}
+        >
+          {loadingSample ? "Loading sample…" : "Try a sample room"}
         </button>
         <input
           ref={inputRef}
