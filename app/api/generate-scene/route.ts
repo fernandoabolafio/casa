@@ -31,8 +31,12 @@ export async function POST(request: Request) {
     const quality = qualitySchema.parse(formData.get("quality") ?? "low");
     const provider = providerSchema.parse(formData.get("provider") ?? "openai");
     const direction = String(formData.get("direction") ?? "").trim();
+    const structureLock = formData.get("structureLock") !== "false";
 
     const baseImageEntry = formData.get("baseImage");
+    const baseCleanEntry = formData.get("baseCleanImage");
+    const baseEditMaskEntry = formData.get("baseEditMask");
+    const hasAnnotationEdits = formData.get("hasAnnotationEdits") === "true";
     const baseImage =
       baseImageEntry instanceof File || typeof baseImageEntry === "string"
         ? baseImageEntry
@@ -85,7 +89,22 @@ export async function POST(request: Request) {
       provider,
       quality,
       direction: direction || undefined,
-      base: baseImage ? { image: baseImage, hints: baseHints } : null,
+      structureLock,
+      base: baseImage
+        ? {
+            image: baseImage,
+            hints: baseHints,
+            cleanImage:
+              baseCleanEntry instanceof File || typeof baseCleanEntry === "string"
+                ? baseCleanEntry
+                : undefined,
+            editMask:
+              baseEditMaskEntry instanceof File || typeof baseEditMaskEntry === "string"
+                ? baseEditMaskEntry
+                : undefined,
+            hasAnnotationEdits,
+          }
+        : null,
       references,
       inspirations,
     });

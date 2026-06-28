@@ -29,10 +29,15 @@ import {
   GenerationPlaceholderShapeUtil,
   type GenerationPlaceholderShape,
 } from "@/components/generation-placeholder-shape";
+import { VoicePromptButton } from "@/components/voice-prompt-button";
+import { buildEditMaskFromDiff } from "@/lib/image-mask";
 import type { ApiSceneResponse, ImageProvider } from "@/lib/types";
 
 const PROVIDER_STORAGE_KEY = "casa.imageProvider";
+const STRUCTURE_LOCK_STORAGE_KEY = "casa.structureLock";
 const ONBOARDING_STORAGE_KEY = "casa.onboardingDismissed";
+const PROMPT_HISTORY_STORAGE_KEY = "casa.promptHistory";
+const MAX_PROMPT_HISTORY = 20;
 
 const PROVIDER_LABELS: Record<ImageProvider, string> = {
   openai: "OpenAI",
@@ -175,7 +180,10 @@ function richTextToPlainText(node: unknown): string {
 
 type CollectedInput = {
   composite: Blob;
+  clean: Blob;
   textHints: string[];
+  editMask: Blob | null;
+  hasAnnotationEdits: boolean;
 };
 
 type GenerationCollection = {
@@ -207,21 +215,43 @@ async function flattenImageWithAnnotations(
   const longEdge = Math.max(imageBounds.width, imageBounds.height);
   const scale = longEdge > 0 ? Math.min(1, MAX_UPLOAD_LONG_EDGE / longEdge) : 1;
 
-  const ids = [imageShape.id, ...overlapping.map((shape) => shape.id)];
-  const result = await editor.toImage(ids, {
-    format: "png",
+  const exportOptions = {
+    format: "png" as const,
     background: false,
     padding: 0,
     bounds: imageBounds,
     scale,
-  });
+  };
+
+  const cleanResult = await editor.toImage([imageShape.id], exportOptions);
+
+  const ids = [imageShape.id, ...overlapping.map((shape) => shape.id)];
+  const compositeResult = await editor.toImage(ids, exportOptions);
+
+  let editMask: Blob | null = null;
+  let hasAnnotationEdits = false;
+
+  if (overlapping.length > 0) {
+    const maskExport = await buildEditMaskFromDiff(
+      cleanResult.blob,
+      compositeResult.blob,
+    );
+    hasAnnotationEdits = maskExport.hasPaint;
+    editMask = maskExport.hasPaint ? maskExport.blob : null;
+  }
 
   const textHints = overlapping
     .filter(isTextShape)
     .map((shape) => richTextToPlainText(shape.props.richText).trim())
     .filter((text): text is string => Boolean(text));
 
-  return { composite: result.blob, textHints };
+  return {
+    composite: compositeResult.blob,
+    clean: cleanResult.blob,
+    textHints,
+    editMask,
+    hasAnnotationEdits,
+  };
 }
 
 type ClusterPickError =
@@ -348,9 +378,11 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
     const editorRef = useRef<Editor | null>(null);
     const jobsRef = useRef<Map<TLShapeId, AbortController>>(new Map());
     const directionRef = useRef("");
+    const structureLockRef = useRef(true);
     const [isDraggingOver, setIsDraggingOver] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [provider, setProviderState] = useState<ImageProvider>("openai");
+    const [structureLock, setStructureLockState] = useState(true);
     const [providerAvailability, setProviderAvailability] = useState<
       Record<ImageProvider, boolean>
     >({ openai: true, gemini: true });
@@ -388,6 +420,30 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         } catch {
           // ignore storage errors
         }
+      }
+    }, []);
+
+    const setStructureLock = useCallback((next: boolean) => {
+      structureLockRef.current = next;
+      setStructureLockState(next);
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(STRUCTURE_LOCK_STORAGE_KEY, next ? "1" : "0");
+        } catch {
+          // ignore storage errors
+        }
+      }
+    }, []);
+
+    useEffect(() => {
+      try {
+        const stored = window.localStorage.getItem(STRUCTURE_LOCK_STORAGE_KEY);
+        if (stored === "0") {
+          structureLockRef.current = false;
+          setStructureLockState(false);
+        }
+      } catch {
+        // ignore
       }
     }, []);
 
@@ -631,10 +687,19 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
 
       const formData = new FormData();
       formData.append("provider", provider);
+      formData.append("structureLock", structureLockRef.current ? "true" : "false");
       if (trimmedDirection) {
         formData.append("direction", trimmedDirection);
       }
       formData.append("baseImage", collection.base.composite, "base.png");
+      formData.append("baseCleanImage", collection.base.clean, "base-clean.png");
+      formData.append(
+        "hasAnnotationEdits",
+        collection.base.hasAnnotationEdits ? "true" : "false",
+      );
+      if (collection.base.editMask) {
+        formData.append("baseEditMask", collection.base.editMask, "base-edit-mask.png");
+      }
       collection.base.textHints.forEach((hint) => {
         formData.append("baseHints", hint);
       });
@@ -743,7 +808,9 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
             errorMessage={errorMessage}
             provider={provider}
             providerAvailability={providerAvailability}
+            structureLock={structureLock}
             onProviderChange={setProvider}
+            onStructureLockChange={setStructureLock}
             directionRef={directionRef}
             onGenerate={enqueueGeneration}
             onShowTips={showOnboardingTips}
@@ -759,6 +826,8 @@ export const DesignBoard = forwardRef<DesignBoardHandle, DesignBoardProps>(
         provider,
         providerAvailability,
         setProvider,
+        structureLock,
+        setStructureLock,
         showOnboardingTips,
       ],
     );
@@ -925,11 +994,55 @@ function BoardOnboarding({
   );
 }
 
+function loadPromptHistory(): string[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(PROMPT_HISTORY_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePromptHistory(history: string[]) {
+  try {
+    window.localStorage.setItem(
+      PROMPT_HISTORY_STORAGE_KEY,
+      JSON.stringify(history.slice(0, MAX_PROMPT_HISTORY)),
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function addToPromptHistory(history: string[], prompt: string): string[] {
+  const trimmed = prompt.trim();
+  if (!trimmed) return history;
+
+  return [trimmed, ...history.filter((entry) => entry !== trimmed)].slice(
+    0,
+    MAX_PROMPT_HISTORY,
+  );
+}
+
+function truncatePrompt(prompt: string, maxLength: number) {
+  if (prompt.length <= maxLength) return prompt;
+  return `${prompt.slice(0, maxLength - 1)}…`;
+}
+
 function GenerateSharePanel({
   errorMessage,
   provider,
   providerAvailability,
+  structureLock,
   onProviderChange,
+  onStructureLockChange,
   directionRef,
   onGenerate,
   onShowTips,
@@ -937,13 +1050,21 @@ function GenerateSharePanel({
   errorMessage: string | null;
   provider: ImageProvider;
   providerAvailability: Record<ImageProvider, boolean>;
+  structureLock: boolean;
   onProviderChange: (next: ImageProvider) => void;
+  onStructureLockChange: (next: boolean) => void;
   directionRef: React.MutableRefObject<string>;
   onGenerate: () => void;
   onShowTips: () => void;
 }) {
   const editor = useEditor();
   const [direction, setDirection] = useState(directionRef.current);
+  const [promptHistory, setPromptHistory] = useState<string[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  useEffect(() => {
+    setPromptHistory(loadPromptHistory());
+  }, []);
 
   const handleDirectionChange = useCallback(
     (next: string) => {
@@ -951,6 +1072,40 @@ function GenerateSharePanel({
       setDirection(next);
     },
     [directionRef],
+  );
+
+  const rememberPrompt = useCallback((prompt: string) => {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+
+    setPromptHistory((current) => {
+      const next = addToPromptHistory(current, trimmed);
+      savePromptHistory(next);
+      return next;
+    });
+  }, []);
+
+  const handleGenerate = useCallback(() => {
+    rememberPrompt(directionRef.current);
+    onGenerate();
+  }, [directionRef, onGenerate, rememberPrompt]);
+
+  const restorePrompt = useCallback(
+    (prompt: string) => {
+      handleDirectionChange(prompt);
+    },
+    [handleDirectionChange],
+  );
+
+  const handleVoiceTranscript = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+
+      const current = directionRef.current.trim();
+      handleDirectionChange(current ? `${current} ${trimmed}` : trimmed);
+    },
+    [directionRef, handleDirectionChange],
   );
 
   const summary = useValue(
@@ -1118,28 +1273,85 @@ function GenerateSharePanel({
         </div>
       </div>
 
-      <input
-        className="direction-input"
-        type="text"
-        placeholder="Optional direction (e.g. cozy, evening light)"
-        value={direction}
-        onChange={(event) => handleDirectionChange(event.target.value)}
-        onPointerDown={(event) => event.stopPropagation()}
-        onKeyDown={(event) => {
-          event.stopPropagation();
-          if (event.key === "Enter" && canGenerate) {
-            event.preventDefault();
-            onGenerate();
-          }
-        }}
-        onKeyUp={(event) => event.stopPropagation()}
-      />
+      <label className="structure-lock-toggle">
+        <input
+          type="checkbox"
+          checked={structureLock}
+          onChange={(event) => onStructureLockChange(event.target.checked)}
+          onPointerDown={(event) => event.stopPropagation()}
+        />
+        <span>
+          Lock room structure
+          <small>
+            Keeps camera angle, walls, and window/door positions fixed. With
+            annotations only, OpenAI uses masked inpainting for tighter control.
+          </small>
+        </span>
+      </label>
+
+      <div className="direction-field">
+        <VoicePromptButton
+          disabled={summary.runningCount > 0}
+          openaiAvailable={providerAvailability.openai}
+          onTranscript={handleVoiceTranscript}
+        />
+
+        <textarea
+          className="direction-input"
+          placeholder="Optional direction — e.g. cozy evening light, swap the sofa for a sectional (⌘↵ to generate)"
+          rows={3}
+          value={direction}
+          onChange={(event) => handleDirectionChange(event.target.value)}
+          onPointerDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (
+              event.key === "Enter" &&
+              (event.metaKey || event.ctrlKey) &&
+              canGenerate
+            ) {
+              event.preventDefault();
+              handleGenerate();
+            }
+          }}
+          onKeyUp={(event) => event.stopPropagation()}
+        />
+
+        {promptHistory.length > 0 ? (
+          <div className="prompt-history">
+            <button
+              type="button"
+              className="prompt-history-toggle"
+              aria-expanded={historyOpen}
+              onClick={() => setHistoryOpen((open) => !open)}
+            >
+              Recent prompts ({promptHistory.length})
+            </button>
+            {historyOpen ? (
+              <ul className="prompt-history-list">
+                {promptHistory.map((prompt, index) => (
+                  <li key={`${index}-${prompt}`}>
+                    <button
+                      type="button"
+                      className="prompt-history-item"
+                      title={prompt}
+                      onClick={() => restorePrompt(prompt)}
+                    >
+                      {truncatePrompt(prompt, 72)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       <button
         className="tlui-button tlui-button__primary generate-button"
         type="button"
         disabled={!canGenerate}
-        onClick={onGenerate}
+        onClick={handleGenerate}
       >
         <span className="tlui-button__label">{label}</span>
       </button>

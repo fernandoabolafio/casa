@@ -1,6 +1,12 @@
 import OpenAI, { toFile } from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
+import {
+  INPAINT_STRUCTURE_INSTRUCTIONS,
+  SPATIAL_LOCK_GEMINI_ADDENDUM,
+  SPATIAL_LOCK_INSTRUCTIONS,
+  shouldUseInpaintPath,
+} from "@/lib/spatial-lock";
 
 export const qualitySchema = z.enum(["low", "medium", "high", "auto"]);
 export const providerSchema = z.enum(["openai", "gemini"]);
@@ -78,6 +84,11 @@ export function extractImageFromResponse(response: unknown): GeneratedImageResul
 export type SceneReference = {
   image: File | string;
   hints: string[];
+  /** Base photo without burned-in annotations — used for inpaint fidelity. */
+  cleanImage?: File | string;
+  /** OpenAI edit mask: transparent = editable, opaque = locked. */
+  editMask?: File | string;
+  hasAnnotationEdits?: boolean;
 };
 
 export type SceneRequest = {
@@ -87,6 +98,8 @@ export type SceneRequest = {
   references?: SceneReference[];
   inspirations?: SceneReference[];
   direction?: string;
+  /** When true, preserve camera, geometry, and openings (default in UI). */
+  structureLock?: boolean;
 };
 
 const SYSTEM_PREAMBLE =
@@ -124,6 +137,7 @@ function formatHintsBlock(label: string, hints: string[]): string | null {
 export async function generateScene(request: SceneRequest) {
   const inspirations = request.inspirations ?? [];
   const references = request.references ?? [];
+  const structureLock = request.structureLock !== false;
 
   if (!request.base && inspirations.length === 0 && references.length === 0) {
     throw new Error(
@@ -131,11 +145,95 @@ export async function generateScene(request: SceneRequest) {
     );
   }
 
+  if (
+    request.base &&
+    shouldUseInpaintPath({
+      structureLock,
+      provider: request.provider,
+      hasAnnotationEdits: Boolean(request.base.hasAnnotationEdits),
+      referenceCount: references.length,
+      inspirationCount: inspirations.length,
+    })
+  ) {
+    return generateSceneViaInpaint(request);
+  }
+
   if (request.provider === "gemini") {
     return generateSceneWithGemini(request);
   }
 
   return generateSceneWithOpenAI(request);
+}
+
+async function fileOrDataUrlToBuffer(image: File | string) {
+  if (image instanceof File) {
+    return Buffer.from(await image.arrayBuffer());
+  }
+
+  return dataUrlToBuffer(image).buffer;
+}
+
+function buildInpaintPrompt(request: SceneRequest): string {
+  const lines = [
+    INPAINT_STRUCTURE_INSTRUCTIONS,
+    BASE_INSTRUCTIONS,
+    BASE_ONLY_AMENDMENT,
+  ];
+
+  if (request.base?.hints.length) {
+    const hintBlock = formatHintsBlock("Annotations on the base", request.base.hints);
+    if (hintBlock) lines.push(hintBlock);
+  }
+
+  if (request.direction?.trim()) {
+    lines.push(`USER DIRECTION: ${request.direction.trim()}`);
+  }
+
+  lines.push(FINAL_INSTRUCTIONS);
+  return lines.join("\n\n");
+}
+
+async function generateSceneViaInpaint(
+  request: SceneRequest,
+): Promise<GeneratedImageResult> {
+  if (!request.base?.cleanImage || !request.base.editMask) {
+    throw new Error("Structure-locked inpaint requires a clean base and edit mask.");
+  }
+
+  const openai = getOpenAIClient();
+  const sourceBuffer = await fileOrDataUrlToBuffer(request.base.cleanImage);
+  const maskBuffer = await fileOrDataUrlToBuffer(request.base.editMask);
+
+  const sourceFile = await toFile(sourceBuffer, "base-clean.png", {
+    type: "image/png",
+  });
+  const maskFile = await toFile(maskBuffer, "edit-mask.png", {
+    type: "image/png",
+  });
+
+  const response = await openai.images.edit({
+    model: "gpt-image-2",
+    image: sourceFile,
+    mask: maskFile,
+    prompt: buildInpaintPrompt(request),
+    quality: request.quality,
+    size: "1536x1024",
+    output_format: "png",
+    input_fidelity: "high",
+  });
+
+  const imageBase64 = response.data?.[0]?.b64_json;
+
+  if (!imageBase64) {
+    throw new Error("OpenAI did not return an inpainted image.");
+  }
+
+  return {
+    imageBase64,
+    mimeType: "image/png",
+    revisedPrompt: response.data?.[0]?.revised_prompt,
+    requestId: response.created ? String(response.created) : undefined,
+  };
 }
 
 type OpenAIContentPart =
@@ -156,7 +254,12 @@ async function buildOpenAIContent(request: SceneRequest): Promise<OpenAIContentP
   const inspirations = request.inspirations ?? [];
   const references = request.references ?? [];
   const hasReferences = references.length > 0;
+  const structureLock = request.structureLock !== false;
   const parts: OpenAIContentPart[] = [{ type: "input_text", text: SYSTEM_PREAMBLE }];
+
+  if (structureLock && request.base) {
+    parts.push({ type: "input_text", text: SPATIAL_LOCK_INSTRUCTIONS });
+  }
 
   if (request.base) {
     const baseLines = [BASE_INSTRUCTIONS];
@@ -261,7 +364,12 @@ async function buildGeminiParts(request: SceneRequest): Promise<GeminiPart[]> {
   const inspirations = request.inspirations ?? [];
   const references = request.references ?? [];
   const hasReferences = references.length > 0;
+  const structureLock = request.structureLock !== false;
   const parts: GeminiPart[] = [{ text: SYSTEM_PREAMBLE }];
+
+  if (structureLock && request.base) {
+    parts.push({ text: `${SPATIAL_LOCK_INSTRUCTIONS}\n\n${SPATIAL_LOCK_GEMINI_ADDENDUM}` });
+  }
 
   if (request.base) {
     const baseLines = [BASE_INSTRUCTIONS];
@@ -381,6 +489,7 @@ export async function editScene({
     quality,
     size: "1536x1024",
     output_format: "png",
+    input_fidelity: "high",
   });
 
   const imageBase64 = response.data?.[0]?.b64_json;
