@@ -135,21 +135,22 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
   }
 
   return (
-    <ComposeChrome>
-      <div className="pb-36">
-        <Link to={roomHref} className="mt-8 block">
-          <div className="relative overflow-hidden rounded-lg border border-[var(--color-muted)]/30">
-            <img
-              src={base.url}
-              alt={base.filename}
-              className="aspect-[16/10] w-full object-cover"
-            />
-            <p className="absolute inset-0 flex items-center justify-center text-sm tracking-wide text-white/90">
-              BASE · the room
-            </p>
-          </div>
+    <ComposeChrome flush>
+      <div className="flex min-h-0 flex-1 flex-col pb-[7.5rem] md:pb-[4.75rem]">
+        <Link
+          to={roomHref}
+          className="relative mt-3 min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--color-muted)]/30"
+        >
+          <img
+            src={base.url}
+            alt={base.filename}
+            className="h-full w-full object-cover"
+          />
+          <p className="absolute inset-x-0 bottom-2 text-center text-xs tracking-wide text-white/90">
+            BASE · the room
+          </p>
         </Link>
-        <label className="mt-3 flex items-center justify-center gap-2 text-xs text-[var(--color-muted)]">
+        <label className="mt-2 flex shrink-0 items-center justify-center gap-2 text-xs text-[var(--color-muted)]">
           <input
             type="checkbox"
             checked={structureLock}
@@ -168,13 +169,13 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
           </span>
         </label>
 
-        <section className="mt-8">
-          <p className="text-sm text-[var(--color-muted)]">Looks</p>
-          <ul className="mt-3 flex flex-wrap gap-3">
+        <section className="mt-2 shrink-0">
+          <p className="text-xs text-[var(--color-muted)]">Looks</p>
+          <ul className="mt-2 flex flex-wrap gap-2">
             {looks.map((item) => (
               <li
                 key={item.id}
-                className="relative h-24 w-28 overflow-hidden rounded-md border border-[var(--color-muted)]/30"
+                className="relative h-16 w-20 overflow-hidden rounded-md border border-[var(--color-muted)]/30"
               >
                 <img
                   src={item.url}
@@ -200,7 +201,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
                   type="button"
                   onClick={() => setLibraryOpen(true)}
                   aria-label="From library"
-                  className="flex h-24 w-28 items-center justify-center rounded-md border border-dashed border-[var(--color-muted)]/50 text-[var(--color-muted)]"
+                  className="flex h-16 w-20 items-center justify-center rounded-md border border-dashed border-[var(--color-muted)]/50 text-[var(--color-muted)]"
                 >
                   <PlusIcon />
                 </button>
@@ -230,30 +231,30 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
           value={structureLock ? "1" : "0"}
         />
         <input type="hidden" name="provider" value={provider} />
-        <div className="mx-auto flex max-w-5xl items-end gap-3">
-          <label className="relative min-w-0 flex-1">
+        <div className="mx-auto flex max-w-5xl flex-col gap-2 md:flex-row md:items-center">
+          <label className="relative w-full min-w-0 md:flex-1">
             <span className="sr-only">Optional direction</span>
             <span className="pointer-events-none absolute left-3 top-2.5 text-[var(--color-muted)]">
               <SparkleIcon />
             </span>
             <textarea
               name="prompt"
-              rows={prompt.trim() ? 3 : 1}
+              rows={1}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               placeholder="Optional direction — swap the sofa, warmer wood"
-              className="w-full resize-none rounded-md border border-[var(--color-muted)]/30 bg-transparent py-2 pl-9 pr-3 text-sm placeholder:text-[var(--color-muted)]"
+              className="w-full resize-none overflow-hidden rounded-md border border-[var(--color-muted)]/30 bg-transparent py-2 pl-9 pr-3 text-sm placeholder:text-[var(--color-muted)]"
             />
           </label>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-[var(--color-muted)]">
+          <div className="flex w-full items-center gap-2 md:w-auto">
+            <label className="min-w-0 flex-1 text-sm text-[var(--color-muted)] md:flex-none">
               <span className="sr-only">Model</span>
               <select
                 value={provider}
                 onChange={(event) =>
                   setProvider(event.target.value === "gemini" ? "gemini" : "openai")
                 }
-                className="rounded-md border border-[var(--color-muted)]/40 bg-[var(--color-page)] px-2 py-2 text-sm"
+                className="w-full rounded-md border border-[var(--color-muted)]/40 bg-[var(--color-page)] px-2 py-2 text-sm md:w-auto"
               >
                 <option value="openai">OpenAI</option>
                 <option value="gemini">Gemini</option>
@@ -262,7 +263,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
             <button
               type="submit"
               disabled={!base.id || submitting}
-              className={primaryActionClass}
+              className={`${primaryActionClass} shrink-0`}
             >
               {submitting ? "Starting…" : "Generate"}
             </button>

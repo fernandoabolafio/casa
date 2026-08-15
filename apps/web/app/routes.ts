@@ -13,6 +13,7 @@ export default [
   route("api/auth/*", "routes/api.auth.$.ts"),
   route("api/images", "routes/api.images.ts"),
   route("api/images/:id", "routes/api.images.$id.ts"),
+  route("api/jobs", "routes/api.jobs.ts"),
   route("api/generate-scene", "routes/api.generate-scene.ts"),
   route("api/edit-scene", "routes/api.edit-scene.ts"),
   route("api/transcribe", "routes/api.transcribe.ts"),

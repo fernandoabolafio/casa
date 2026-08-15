@@ -79,6 +79,21 @@ export function CloseIcon() {
   );
 }
 
+export function CheckIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+    >
+      <path d="M5 12.5l5 5L19 7" />
+    </svg>
+  );
+}
+
 export function PlusIcon() {
   return (
     <svg

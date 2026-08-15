@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Link, redirect, useRevalidator } from "react-router";
+import { useEffect, useRef } from "react";
+import { Link, redirect, useFetcher } from "react-router";
 
 import type { Route } from "./+types/home";
 
@@ -70,22 +70,43 @@ function Landing() {
   );
 }
 
-function HomeJobs({ jobs, now }: { jobs: GenerationJob[]; now: number }) {
-  const revalidator = useRevalidator();
+type JobsPayload = {
+  jobs: GenerationJob[];
+  now: number;
+};
+
+function HomeJobs({
+  jobs: loaderJobs,
+  now: loaderNow,
+}: {
+  jobs: GenerationJob[];
+  now: number;
+}) {
+  const fetcher = useFetcher<JobsPayload>();
+  const jobs = fetcher.data?.jobs ?? loaderJobs;
+  const now = fetcher.data?.now ?? loaderNow;
   const running = jobs.filter((job) => job.status === "running");
   const finished = jobs.filter((job) => job.status !== "running");
   const latestWinnerId =
     finished.find((job) => job.status === "done" && job.result)?.id ?? null;
+  const hasRunning = running.length > 0;
+  const pollRef = useRef(fetcher);
 
   useEffect(() => {
-    if (running.length === 0) {
+    pollRef.current = fetcher;
+  }, [fetcher]);
+
+  useEffect(() => {
+    if (!hasRunning) {
       return;
     }
-    const timer = window.setInterval(() => {
-      void revalidator.revalidate();
-    }, 4000);
+    function tick() {
+      void pollRef.current.load("/api/jobs");
+    }
+    tick();
+    const timer = window.setInterval(tick, 2000);
     return () => window.clearInterval(timer);
-  }, [running.length, revalidator]);
+  }, [hasRunning]);
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-8">

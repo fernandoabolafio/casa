@@ -36,17 +36,27 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const selectedLooks = compose.lookIds
     .map((id) => images.find((item) => item.id === id))
     .filter((item): item is GalleryImage => Boolean(item));
+  const baseImage =
+    images.find((item) => item.id === compose.baseId) ??
+    ({
+      id: base.id,
+      filename: base.filename,
+      kind: base.kind,
+      createdAt: base.createdAt,
+      url: `/api/images/${base.id}`,
+    } satisfies GalleryImage);
 
   return {
     images,
     compose: { ...compose, lookIds: selectedLooks.map((item) => item.id) },
     selectedLooks,
+    base: baseImage,
   };
 }
 
 export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
-  const { images, compose, selectedLooks } = loaderData;
+  const { images, compose, selectedLooks, base } = loaderData;
   const [libraryOpen, setLibraryOpen] = useState(false);
 
   function go(nextLooks: string[]) {
@@ -80,6 +90,20 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
       <p className="mt-2 text-sm text-[var(--color-muted)]">
         Style only. Will not move your windows.
       </p>
+
+      <div className="mt-6 flex items-center gap-3">
+        <img
+          src={base.url}
+          alt={base.filename}
+          className="h-14 w-14 rounded-md object-cover"
+        />
+        <div>
+          <p className="text-xs uppercase tracking-wide text-[var(--color-muted)]">
+            The room
+          </p>
+          <p className="truncate text-sm">{base.filename}</p>
+        </div>
+      </div>
 
       <section className="mt-8">
         <p className="text-sm text-[var(--color-muted)]">

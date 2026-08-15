@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 
-import { CloseIcon, GridIcon, UploadIcon } from "~/components/icons";
+import { CheckIcon, CloseIcon, GridIcon, UploadIcon } from "~/components/icons";
 import { primaryActionClass, secondaryActionClass } from "~/lib/compose";
 import type { GalleryImage } from "~/lib/images.server";
 import { uploadImage } from "~/lib/upload-image";
@@ -98,6 +98,7 @@ export function LibraryModal({
 }) {
   const titleId = useId();
   const [pile, setPile] = useState<Pile>("upload");
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const uploads = images.filter((item) => item.kind === "upload");
   const generations = images.filter((item) => item.kind === "generation");
   const shown = pile === "upload" ? uploads : generations;
@@ -118,6 +119,7 @@ export function LibraryModal({
   useEffect(() => {
     if (!open) {
       setPile("upload");
+      setPendingId(null);
     }
   }, [open]);
 
@@ -126,23 +128,26 @@ export function LibraryModal({
   }
 
   function pick(image: GalleryImage) {
+    setPendingId(image.id);
     onSelect(image);
     if (mode === "single") {
-      onClose();
+      window.setTimeout(() => onClose(), 160);
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-8">
+      <button
+        type="button"
+        aria-label="Close library"
+        className="absolute inset-0 bg-black/70"
+        onClick={onClose}
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--color-muted)]/30 bg-[var(--color-page)] p-5"
-        onClick={(event) => event.stopPropagation()}
+        className="relative z-10 flex max-h-[80vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--color-muted)]/30 bg-[var(--color-page)] p-5"
       >
         <div className="flex items-center justify-between gap-4">
           <h2 id={titleId} className="text-lg font-medium">
@@ -179,13 +184,21 @@ export function LibraryModal({
           ) : (
             <ul className="grid grid-cols-3 gap-3">
               {shown.map((item) => {
-                const selected = selectedIds.includes(item.id);
+                const selected =
+                  pendingId === item.id || selectedIds.includes(item.id);
                 return (
                   <li key={item.id}>
                     <button
                       type="button"
-                      onClick={() => pick(item)}
-                      className={`block w-full overflow-hidden rounded-md border ${
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                        pick(item);
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        pick(item);
+                      }}
+                      className={`relative block w-full overflow-hidden rounded-md border-2 ${
                         selected
                           ? "border-[var(--color-accent)]"
                           : "border-[var(--color-muted)]/30"
@@ -194,8 +207,13 @@ export function LibraryModal({
                       <img
                         src={item.url}
                         alt={item.filename}
-                        className="aspect-[4/3] w-full object-cover"
+                        className="pointer-events-none aspect-[4/3] w-full object-cover"
                       />
+                      {selected ? (
+                        <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-accent)] text-[var(--color-page)]">
+                          <CheckIcon />
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 );
