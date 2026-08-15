@@ -211,6 +211,7 @@ function DoneCard({
   }
 
   const preview = job.result ?? job.base;
+  const resultHref = job.result ? `/results/${job.id}` : null;
   const promoteHref = job.result
     ? composePath("looks", { baseId: job.result.id })
     : null;
@@ -223,8 +224,8 @@ function DoneCard({
           : "border-[var(--color-muted)]/30"
       }`}
     >
-      {preview && promoteHref ? (
-        <Link to={promoteHref}>
+      {preview && resultHref ? (
+        <Link to={resultHref}>
           <img
             src={preview.url}
             alt={jobTitle(job.prompt)}

@@ -18,6 +18,7 @@ export type GenerationJob = {
   updatedAt: number;
   error: string | null;
   inspirationIds: string[];
+  inspirations: GalleryImage[];
   base: GalleryImage | null;
   result: GalleryImage | null;
 };
@@ -58,6 +59,9 @@ function toJob(
     updatedAt: row.updatedAt,
     error: row.error,
     inspirationIds: parseInspirationIds(row.inspirationIds),
+    inspirations: parseInspirationIds(row.inspirationIds)
+      .map((id) => imagesById.get(id))
+      .filter((item): item is GalleryImage => Boolean(item)),
     base: imagesById.get(row.baseImageId) ?? null,
     result: row.resultImageId
       ? (imagesById.get(row.resultImageId) ?? null)
@@ -74,6 +78,9 @@ async function attachImages(
     ids.add(row.baseImageId);
     if (row.resultImageId) {
       ids.add(row.resultImageId);
+    }
+    for (const id of parseInspirationIds(row.inspirationIds)) {
+      ids.add(id);
     }
   }
 
@@ -191,6 +198,19 @@ export async function markGenerationFailed(input: {
       updatedAt: Date.now(),
     })
     .where(eq(generation.id, input.jobId));
+}
+
+export async function getUserGenerationJob(
+  env: Env,
+  userId: string,
+  jobId: string,
+): Promise<GenerationJob | null> {
+  const row = await getGeneration(env, jobId);
+  if (!row || row.userId !== userId) {
+    return null;
+  }
+  const [job] = await attachImages(env, [row]);
+  return job ?? null;
 }
 
 export function lastDoneJob(jobs: GenerationJob[]): GenerationJob | null {

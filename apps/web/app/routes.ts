@@ -8,6 +8,7 @@ export default [
     route("looks", "routes/generate.looks.tsx"),
     route("mosaic", "routes/generate.mosaic.tsx"),
   ]),
+  route("results/:jobId", "routes/results.$jobId.tsx"),
   route("sign-in", "routes/sign-in.tsx"),
   route("sign-up", "routes/sign-up.tsx"),
   route("api/auth/*", "routes/api.auth.$.ts"),
