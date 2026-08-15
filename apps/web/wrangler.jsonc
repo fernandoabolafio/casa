@@ -11,8 +11,8 @@
   // Vars (not secrets). Point these at the Worker URL in production.
   // Secret: wrangler secret put BETTER_AUTH_SECRET
   "vars": {
-    "BETTER_AUTH_URL": "http://localhost:5173",
-    "PUBLIC_WEB_URL": "http://localhost:5173"
+    "BETTER_AUTH_URL": "https://casa-web.hi-c3a.workers.dev",
+    "PUBLIC_WEB_URL": "https://casa-web.hi-c3a.workers.dev"
   },
   "d1_databases": [
     {
