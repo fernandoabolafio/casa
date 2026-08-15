@@ -7,7 +7,7 @@ pnpm workspace. Two apps:
 
 ## Install
 
-Node 20.9 or newer. pnpm 9 or newer. `@casa/web` is React Router 8, which wants Node 22.
+Node 20.9 or newer for the repo. `@casa/web` is React Router 8 and needs Node 22.22 or newer. pnpm 9 or newer.
 
 ```bash
 pnpm install

@@ -15,3 +15,5 @@ bun.lock
 *.log
 *.tsbuildinfo
 .pnpm-store/
+AGENTS.md
+CLAUDE.md

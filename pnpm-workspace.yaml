@@ -1,2 +1,9 @@
 packages:
   - "apps/*"
+
+onlyBuiltDependencies:
+  - "@google/genai"
+  - esbuild
+  - protobufjs
+  - unrs-resolver
+  - workerd

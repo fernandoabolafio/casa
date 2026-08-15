@@ -9,6 +9,7 @@ import type { Route } from "./+types/api.generate-scene";
  *
  * Expected later: multipart images, prompt, provider, quality.
  * Secrets: OPENAI_API_KEY, GEMINI_API_KEY (wrangler secret / .dev.vars).
+ * Read them with `context.get(cloudflareContext).env` from `~/cloudflare-context`.
  */
 export function action(_args: Route.ActionArgs) {
   return Response.json(
