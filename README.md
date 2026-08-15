@@ -65,14 +65,9 @@ npx wrangler secret put OPENAI_API_KEY
 npx wrangler secret put GEMINI_API_KEY
 ```
 
-GitHub secrets stay `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+GitHub secrets stay `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. This repo does not have them yet, so CI cannot deploy. Deploy from a machine with `wrangler` logged in, or put those two values in the cloud-agent environment.
 
-Before the first remote deploy, create the D1 database and R2 bucket, then put the real D1 id in `apps/web/wrangler.jsonc` (placeholder `00000000-0000-0000-0000-000000000000` is local-only):
-
-```bash
-npx wrangler d1 create casa
-npx wrangler r2 bucket create casa-images
-```
+D1 `casa` (`06906658-5515-4f5d-9064-b5a65a01bc2e`) and R2 `casa-images` already exist. Do not create another database or bucket. `OPENAI_API_KEY` and `GEMINI_API_KEY` are still unset. Generate stays 501.
 
 ## Deploy
 

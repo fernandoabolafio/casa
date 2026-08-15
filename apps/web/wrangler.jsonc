@@ -18,7 +18,7 @@
     {
       "binding": "DB",
       "database_name": "casa",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "06906658-5515-4f5d-9064-b5a65a01bc2e",
       "migrations_dir": "drizzle"
     }
   ],
