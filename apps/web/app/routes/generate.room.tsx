@@ -4,7 +4,7 @@ import type { Route } from "./+types/generate.room";
 
 import { ComposeChrome } from "~/components/compose-chrome";
 import { LibraryPicker } from "~/components/library-picker";
-import { composePath, parseCompose } from "~/lib/compose";
+import { composePath, parseCompose, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import {
   lastDoneJob,
@@ -73,6 +73,7 @@ export default function GenerateRoom({ loaderData }: Route.ComponentProps) {
           selectedIds={compose.baseId ? [compose.baseId] : []}
           mode="single"
           uploadLabel="Upload a photo"
+          emphasizeUpload={images.filter((item) => item.kind === "upload").length === 0}
           onUploaded={pickBase}
           onSelect={pickBase}
         />
@@ -107,15 +108,16 @@ function ContinueFromLast({
         <img
           src={image.url}
           alt={image.filename}
-          className="h-20 w-20 rounded object-cover"
+          className="h-24 w-24 rounded object-cover"
         />
-        <span>
+        <span className="min-w-0 flex-1">
           <span className="block text-sm">
             {prompt.trim() || image.filename}
           </span>
           <span className="mt-1 block text-xs text-[var(--color-muted)]">
             Generated {formatAgo(createdAt, now)}
           </span>
+          <span className={`${primaryActionClass} mt-3`}>Continue from last</span>
         </span>
       </button>
     </section>

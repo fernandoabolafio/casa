@@ -4,7 +4,7 @@ import { Link, redirect, useRevalidator } from "react-router";
 import type { Route } from "./+types/home";
 
 import { signOut } from "~/lib/auth";
-import { composePath, jobTitle } from "~/lib/compose";
+import { composePath, jobTitle, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import {
   listUserGenerations,
@@ -49,8 +49,8 @@ function Landing() {
         Home design, from a photo.
       </h1>
       <p className="mt-4 max-w-lg text-[var(--color-muted)]">
-        Pick a room, steal a look if you want, generate. Come back to the same
-        list when it is done.
+        Upload a room photo, generate, pick a winner. That winner is the next
+        room.
       </p>
       <p className="mt-8 flex flex-wrap gap-3">
         <Link
@@ -74,6 +74,8 @@ function HomeJobs({ jobs, now }: { jobs: GenerationJob[]; now: number }) {
   const revalidator = useRevalidator();
   const running = jobs.filter((job) => job.status === "running");
   const finished = jobs.filter((job) => job.status !== "running");
+  const latestWinnerId =
+    finished.find((job) => job.status === "done" && job.result)?.id ?? null;
 
   useEffect(() => {
     if (running.length === 0) {
@@ -148,7 +150,12 @@ function HomeJobs({ jobs, now }: { jobs: GenerationJob[]; now: number }) {
           <h2 className="text-sm text-[var(--color-muted)]">Done</h2>
           <ul className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {finished.map((job) => (
-              <DoneCard key={job.id} job={job} now={now} />
+              <DoneCard
+                key={job.id}
+                job={job}
+                now={now}
+                featured={job.id === latestWinnerId}
+              />
             ))}
           </ul>
         </section>
@@ -157,7 +164,15 @@ function HomeJobs({ jobs, now }: { jobs: GenerationJob[]; now: number }) {
   );
 }
 
-function DoneCard({ job, now }: { job: GenerationJob; now: number }) {
+function DoneCard({
+  job,
+  now,
+  featured,
+}: {
+  job: GenerationJob;
+  now: number;
+  featured: boolean;
+}) {
   if (job.status === "failed") {
     return (
       <li className="overflow-hidden rounded-lg border border-[var(--color-muted)]/30">
@@ -175,9 +190,27 @@ function DoneCard({ job, now }: { job: GenerationJob; now: number }) {
   }
 
   const preview = job.result ?? job.base;
+  const promoteHref = job.result
+    ? composePath("looks", { baseId: job.result.id })
+    : null;
+
   return (
-    <li className="overflow-hidden rounded-lg border border-[var(--color-muted)]/30">
-      {preview ? (
+    <li
+      className={`overflow-hidden rounded-lg border ${
+        featured
+          ? "border-[var(--color-accent)]"
+          : "border-[var(--color-muted)]/30"
+      }`}
+    >
+      {preview && promoteHref ? (
+        <Link to={promoteHref}>
+          <img
+            src={preview.url}
+            alt={jobTitle(job.prompt)}
+            className="aspect-[4/3] w-full object-cover"
+          />
+        </Link>
+      ) : preview ? (
         <img
           src={preview.url}
           alt={jobTitle(job.prompt)}
@@ -191,11 +224,8 @@ function DoneCard({ job, now }: { job: GenerationJob; now: number }) {
         <p className="mt-1 text-xs text-[var(--color-muted)]">
           {formatAgo(job.createdAt, now)}
         </p>
-        {job.result ? (
-          <Link
-            to={composePath("looks", { baseId: job.result.id })}
-            className="mt-3 inline-block text-sm text-[var(--color-accent)]"
-          >
+        {promoteHref ? (
+          <Link to={promoteHref} className={`${primaryActionClass} mt-3 w-full`}>
             Use as base
           </Link>
         ) : null}

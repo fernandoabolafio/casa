@@ -5,7 +5,7 @@ import type { Route } from "./+types/generate.looks";
 import { CloseIcon, PlusIcon } from "~/components/icons";
 import { ComposeChrome } from "~/components/compose-chrome";
 import { LibraryPicker } from "~/components/library-picker";
-import { LOOK_CAP, composePath, parseCompose } from "~/lib/compose";
+import { LOOK_CAP, composePath, parseCompose, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import {
   getOwnedImage,
@@ -131,7 +131,7 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
         </Link>
         <Link
           to={mosaicHref}
-          className="rounded-md bg-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-page)]"
+          className={primaryActionClass}
         >
           Continue
         </Link>

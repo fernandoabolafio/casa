@@ -11,7 +11,7 @@ import type { Route } from "./+types/generate.mosaic";
 
 import { ComposeChrome } from "~/components/compose-chrome";
 import { CloseIcon, LockIcon, PlusIcon, SparkleIcon } from "~/components/icons";
-import { LOOK_CAP, composePath, parseCompose } from "~/lib/compose";
+import { LOOK_CAP, composePath, parseCompose, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import { enqueueGeneration } from "~/lib/generate/start";
 import { providerSchema } from "~/lib/generate/scene";
@@ -231,7 +231,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
             <button
               type="submit"
               disabled={!base.id || submitting}
-              className="rounded-md bg-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-page)] disabled:opacity-50"
+              className={primaryActionClass}
             >
               {submitting ? "Starting…" : "Generate"}
             </button>

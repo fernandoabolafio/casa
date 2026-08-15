@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 
 import { GridIcon, UploadIcon } from "~/components/icons";
+import { primaryActionClass, secondaryActionClass } from "~/lib/compose";
 import type { GalleryImage } from "~/lib/images.server";
 import { uploadImage } from "~/lib/upload-image";
 
@@ -14,6 +15,7 @@ export function LibraryPicker({
   onUploaded,
   onSelect,
   showActions = true,
+  emphasizeUpload = false,
 }: {
   images: GalleryImage[];
   selectedIds: string[];
@@ -22,6 +24,7 @@ export function LibraryPicker({
   onUploaded: (image: GalleryImage) => void;
   onSelect: (image: GalleryImage) => void;
   showActions?: boolean;
+  emphasizeUpload?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLDivElement>(null);
@@ -70,7 +73,9 @@ export function LibraryPicker({
             type="button"
             disabled={uploading}
             onClick={() => inputRef.current?.click()}
-            className="flex items-center justify-center gap-2 rounded-md border border-[var(--color-ink)]/70 px-4 py-3 text-sm disabled:opacity-50"
+            className={`flex items-center justify-center gap-2 px-4 py-3 ${
+              emphasizeUpload ? primaryActionClass : secondaryActionClass
+            }`}
           >
             <UploadIcon />
             {uploading ? "Uploading…" : uploadLabel}
@@ -80,7 +85,7 @@ export function LibraryPicker({
             onClick={() =>
               libraryRef.current?.scrollIntoView({ behavior: "smooth" })
             }
-            className="flex items-center justify-center gap-2 rounded-md border border-[var(--color-ink)]/70 px-4 py-3 text-sm"
+            className={`flex items-center justify-center gap-2 px-4 py-3 ${secondaryActionClass}`}
           >
             <GridIcon />
             From library
