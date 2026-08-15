@@ -1,0 +1,19 @@
+@import "tailwindcss" source(".");
+
+@theme {
+  --font-sans: "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --color-ink: #f6edda;
+  --color-muted: #b6a88b;
+  --color-accent: #d9a441;
+  --color-page: #13110e;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  color-scheme: dark;
+}

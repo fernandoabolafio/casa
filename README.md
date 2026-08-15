@@ -1,58 +1,65 @@
-# Casa Home Design
+# Casa
 
-A local Next.js MVP for canvas-based home design exploration. Drop room photos, floor plans, inspiration images, and generated outputs onto a freeform tldraw board, then select any image set to generate a new interior scene back onto the same canvas.
+pnpm workspace. Two apps:
 
-## Setup
+- `apps/web` (`@casa/web`) is the product. React Router v8 on Cloudflare Workers.
+- `apps/canvas` (`@casa/canvas`) is the original Next.js + tldraw board. Reference only. It still runs and still has generate / edit / Whisper. It will be phased out later, not deleted.
 
-This project uses regular Node.js with npm. Do not install dependencies with Bun, pnpm, or Yarn; `package-lock.json` is the source of truth for dependency resolution.
+## Install
 
-Prerequisites:
-
-- Node.js 20.9 or newer.
-- npm 11 or newer.
-- API keys for whichever image providers you plan to use.
+Node 20.9 or newer. pnpm 9 or newer. `@casa/web` is React Router 8, which wants Node 22.
 
 ```bash
-cp .env.local.example .env.local
-npm install
-npm run dev
+pnpm install
 ```
 
-Open http://localhost:3000 after the dev server starts.
+Do not use npm or bun at the root. `pnpm-lock.yaml` is the lockfile.
 
-## Environment Variables
+## Run
 
-Create `.env.local` from `.env.local.example` and fill in the keys you need:
+Product app:
 
 ```bash
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=...
+pnpm --filter @casa/web dev
+# or
+pnpm dev
 ```
 
-- `OPENAI_API_KEY` is required when using the OpenAI provider.
-- `GEMINI_API_KEY` is required when using the Gemini provider.
-- `GOOGLE_API_KEY` can be used as a fallback for Gemini if `GEMINI_API_KEY` is not set.
-
-Keep real API keys in `.env.local`; do not commit local environment files.
-
-## Canvas Workflow
-
-- Drop or choose image files to add them as movable, resizable tldraw image shapes.
-- Mark one selected image as the base, optionally mark selected images as references, and leave the rest as inspirations.
-- Add a design prompt and optional queued instructions.
-- Click `Generate` in the side panel or the contextual on-canvas action bubble.
-- The generated result is inserted back into the board as another image shape.
-
-## Image Generation Workflow
-
-- `/api/generate-scene` sends selected canvas images to either OpenAI or Gemini, depending on the provider selected in the UI.
-- `/api/edit-scene` remains available for masked edit work on a selected generated image through OpenAI.
-- Draft renders default well to `quality: "low"`; switch to `medium` or `high` for slower final renders.
-
-## Verify
+Legacy canvas (tldraw):
 
 ```bash
-npm run typecheck
-npm run lint
-npm run verify
+cp apps/canvas/.env.local.example apps/canvas/.env.local
+pnpm --filter @casa/canvas dev
 ```
+
+Canvas listens on http://localhost:3000. Web uses the Vite / Workers port Vite prints (usually 5173).
+
+## Deploy
+
+`apps/web` uses Wrangler and `@cloudflare/vite-plugin`, same path as [Cloudflare's React Router guide](https://developers.cloudflare.com/workers/framework-guides/web-apps/react-router/).
+
+```bash
+pnpm --filter @casa/web deploy
+```
+
+CI deploys `@casa/web` on push to `main`. Repo secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+Those names are the ones Cloudflare documents for `wrangler-action`.
+
+Canvas still uses OpenNext + Wrangler (`apps/canvas/wrangler.jsonc`), unchanged:
+
+```bash
+pnpm --filter @casa/canvas deploy
+```
+
+## Layout
+
+```
+apps/web      product (React Router v8 + Workers)
+apps/canvas   reference tldraw / Next.js app
+```
+
+No shared `packages/` yet. Prompt / image / Whisper code stays in canvas until a cut can be made without changing behavior.

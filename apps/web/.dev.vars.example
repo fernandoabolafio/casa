@@ -1,0 +1,6 @@
+# Copy to apps/web/.dev.vars for local wrangler / Vite Workers runtime.
+# Same names as the canvas app. Do not commit the real file.
+
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=
+# GOOGLE_API_KEY=
