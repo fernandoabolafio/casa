@@ -66,7 +66,9 @@ export async function signUpEmail(
 export async function signOut() {
   const response = await fetch(`${AUTH_BASE}/sign-out`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     credentials: "include",
+    body: JSON.stringify({}),
   });
   if (!response.ok) {
     throw new Error(await readError(response));
