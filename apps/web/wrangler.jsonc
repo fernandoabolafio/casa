@@ -8,8 +8,10 @@
     "enabled": true
   },
   "upload_source_maps": true,
-  // Vars (not secrets). Point these at the Worker URL in production.
-  // Secret: wrangler secret put BETTER_AUTH_SECRET
+  // Vars (not secrets). Auth URLs are the live Worker.
+  // Secrets: wrangler secret put BETTER_AUTH_SECRET
+  //           wrangler secret put OPENAI_API_KEY
+  //           wrangler secret put GEMINI_API_KEY
   "vars": {
     "BETTER_AUTH_URL": "https://casa-web.hi-c3a.workers.dev",
     "PUBLIC_WEB_URL": "https://casa-web.hi-c3a.workers.dev"

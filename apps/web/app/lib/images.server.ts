@@ -95,3 +95,59 @@ export async function storeUpload(input: {
     url: `/api/images/${id}`,
   };
 }
+
+export async function loadOwnedImageFile(
+  env: Env,
+  userId: string,
+  imageId: string,
+): Promise<File | null> {
+  const row = await getOwnedImage(env, userId, imageId);
+  if (!row) {
+    return null;
+  }
+
+  const object = await env.IMAGES.get(row.r2Key);
+  if (!object) {
+    return null;
+  }
+
+  return new File([await object.arrayBuffer()], row.filename, {
+    type: row.contentType,
+  });
+}
+
+export async function storeGeneratedImage(input: {
+  env: Env;
+  userId: string;
+  bytes: ArrayBuffer;
+  filename?: string;
+}): Promise<GalleryImage> {
+  const { env, userId, bytes } = input;
+  const id = crypto.randomUUID();
+  const r2Key = `${userId}/${id}`;
+  const filename = input.filename ?? `generation-${id}.png`;
+
+  await env.IMAGES.put(r2Key, bytes, {
+    httpMetadata: { contentType: "image/png" },
+  });
+
+  const createdAt = Date.now();
+  const db = createDb(env);
+  await db.insert(image).values({
+    id,
+    userId,
+    r2Key,
+    contentType: "image/png",
+    kind: "generation",
+    filename,
+    createdAt,
+  });
+
+  return {
+    id,
+    filename,
+    kind: "generation",
+    createdAt,
+    url: `/api/images/${id}`,
+  };
+}

@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Form, useActionData, useNavigation } from "react-router";
 
 import { signOut } from "~/lib/auth";
+import type { ImageProvider } from "~/lib/generate/types";
 import type { GalleryImage } from "~/lib/images.server";
+import { loadPromptHistory, rememberPrompt } from "~/lib/prompt-history";
 
 type WorkingRole = "base" | "reference" | "inspiration";
 
@@ -35,7 +37,35 @@ export function WorkingSetStudio({
   const actionData = useActionData<{ error?: string }>();
   const uploading = navigation.state !== "idle";
   const [workingSet, setWorkingSet] = useState<WorkingSet>(emptySet);
+  const [gallery, setGallery] = useState(images);
   const [prompt, setPrompt] = useState("");
+  const [provider, setProvider] = useState<ImageProvider>("openai");
+  const [structureLock, setStructureLock] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<GalleryImage | null>(null);
+  const [promptHistory, setPromptHistory] = useState<string[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  useEffect(() => {
+    setGallery(images);
+  }, [images]);
+
+  useEffect(() => {
+    setPromptHistory(loadPromptHistory());
+    try {
+      if (window.localStorage.getItem("casa.structureLock") === "0") {
+        setStructureLock(false);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const canGenerate =
+    Boolean(workingSet.base) ||
+    workingSet.references.length > 0 ||
+    workingSet.inspirations.length > 0;
 
   function assign(image: GalleryImage, role: WorkingRole) {
     setWorkingSet((current) => {
@@ -65,6 +95,61 @@ export function WorkingSetStudio({
           : [...current.inspirations, image],
       };
     });
+  }
+
+  function persistStructureLock(next: boolean) {
+    setStructureLock(next);
+    try {
+      window.localStorage.setItem("casa.structureLock", next ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }
+
+  async function onGenerate() {
+    if (!canGenerate || generating) {
+      return;
+    }
+
+    setGenerateError(null);
+    setGenerating(true);
+    setPromptHistory(rememberPrompt(prompt));
+
+    try {
+      const response = await fetch("/api/generate-scene", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider,
+          quality: "low",
+          direction: prompt,
+          structureLock,
+          baseId: workingSet.base?.id ?? null,
+          referenceIds: workingSet.references.map((item) => item.id),
+          inspirationIds: workingSet.inspirations.map((item) => item.id),
+        }),
+      });
+      const body = (await response.json()) as {
+        image?: GalleryImage;
+        error?: string;
+      };
+      if (!response.ok || !body.image) {
+        throw new Error(body.error ?? "Generate failed.");
+      }
+
+      setLastResult(body.image);
+      setGallery((current) => [
+        body.image!,
+        ...current.filter((item) => item.id !== body.image!.id),
+      ]);
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : "Generate failed.",
+      );
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function clearSlot(role: WorkingRole, id?: string) {
@@ -165,16 +250,15 @@ export function WorkingSetStudio({
       <section className="mt-8">
         <h2 className="text-lg font-medium">Gallery</h2>
         <p className="mt-2 text-sm text-[var(--color-muted)]">
-          Pick an image into a working-set slot. Later generations will land
-          here too.
+          Pick an image into a working-set slot. Generations land here too.
         </p>
-        {images.length === 0 ? (
+        {gallery.length === 0 ? (
           <p className="mt-6 text-[var(--color-muted)]">
             No images yet. Upload one above.
           </p>
         ) : (
           <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {images.map((item) => (
+            {gallery.map((item) => (
               <li
                 key={item.id}
                 className="overflow-hidden rounded-lg border border-[var(--color-muted)]/30"
@@ -209,24 +293,106 @@ export function WorkingSetStudio({
 
       <section className="mt-10 rounded-lg border border-[var(--color-muted)]/30 p-5">
         <h2 className="text-lg font-medium">Prompt</h2>
+        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Provider">
+          {(["openai", "gemini"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={provider === option}
+              onClick={() => setProvider(option)}
+              className={`rounded border px-3 py-1 text-sm ${
+                provider === option
+                  ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                  : "border-[var(--color-muted)]/40"
+              }`}
+            >
+              {option === "openai" ? "OpenAI" : "Gemini"}
+            </button>
+          ))}
+        </div>
+        <label className="mt-4 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={structureLock}
+            onChange={(event) => persistStructureLock(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            Lock room structure
+            <span className="block text-[var(--color-muted)]">
+              Keeps camera, walls, and openings fixed. BASE wins geometry;
+              REFERENCES win furniture and materials; INSPIRATIONS fill gaps.
+            </span>
+          </span>
+        </label>
         <textarea
           rows={4}
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          placeholder="Describe the room you want to generate"
+          placeholder="Optional direction — e.g. cozy evening light, swap the sofa"
           className="mt-3 w-full resize-y rounded-md border border-[var(--color-muted)]/40 bg-transparent px-3 py-2 text-[var(--color-ink)] placeholder:text-[var(--color-muted)]"
         />
-        <p className="mt-3 text-sm text-[var(--color-muted)]">
-          TODO: generate-scene, edit-scene, prompt history, voice prompt. The
-          working implementations still live in <code>apps/canvas</code>.
-        </p>
+        {promptHistory.length > 0 ? (
+          <div className="mt-3">
+            <button
+              type="button"
+              className="text-sm text-[var(--color-muted)] underline"
+              onClick={() => setHistoryOpen((open) => !open)}
+            >
+              Recent prompts ({promptHistory.length})
+            </button>
+            {historyOpen ? (
+              <ul className="mt-2 space-y-1">
+                {promptHistory.map((entry) => (
+                  <li key={entry}>
+                    <button
+                      type="button"
+                      className="truncate text-left text-sm text-[var(--color-accent)]"
+                      onClick={() => setPrompt(entry)}
+                    >
+                      {entry.length > 72 ? `${entry.slice(0, 71)}…` : entry}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+        {generateError ? (
+          <p className="mt-3 text-sm text-[var(--color-accent)]">{generateError}</p>
+        ) : null}
         <button
           type="button"
-          disabled
+          disabled={!canGenerate || generating}
+          onClick={() => void onGenerate()}
           className="mt-5 rounded-md bg-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-page)] disabled:opacity-50"
         >
-          Generate (not implemented)
+          {generating ? "Generating…" : "Generate"}
         </button>
+        {!canGenerate ? (
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
+            Pick a base, reference, or inspiration first.
+          </p>
+        ) : null}
+        {lastResult ? (
+          <div className="mt-6 flex items-center gap-4">
+            <img
+              src={lastResult.url}
+              alt={lastResult.filename}
+              className="h-24 w-24 rounded object-cover"
+            />
+            <div>
+              <p className="text-sm">Latest generation</p>
+              <button
+                type="button"
+                className="mt-2 text-sm text-[var(--color-accent)] underline"
+                onClick={() => assign(lastResult, "base")}
+              >
+                Use as base
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
     </main>
   );

@@ -26,7 +26,7 @@ pnpm --filter @casa/web db:migrate
 pnpm --filter @casa/web dev
 ```
 
-Open http://localhost:5173. Sign up, then `/generate` to upload images and pick a working set.
+Open http://localhost:5173. Sign up, then `/generate` to upload images, pick a working set, and generate. Local generate needs `OPENAI_API_KEY` / `GEMINI_API_KEY` in `.dev.vars`.
 
 Local D1 and R2 are Wrangler's emulators. `db:migrate` applies `apps/web/drizzle` to the local `casa` database.
 
@@ -60,14 +60,17 @@ Worker secret (not GitHub):
 ```bash
 cd apps/web
 npx wrangler secret put BETTER_AUTH_SECRET
-# later
 npx wrangler secret put OPENAI_API_KEY
 npx wrangler secret put GEMINI_API_KEY
 ```
 
-GitHub secrets stay `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. This repo does not have them yet, so CI cannot deploy. Deploy from a machine with `wrangler` logged in, or put those two values in the cloud-agent environment.
+Those image keys are already set on the live Worker. Do not put them in the repo or in GitHub secrets.
 
-D1 `casa` (`06906658-5515-4f5d-9064-b5a65a01bc2e`) and R2 `casa-images` already exist. Do not create another database or bucket. `OPENAI_API_KEY` and `GEMINI_API_KEY` are still unset. Generate stays 501.
+GitHub secrets stay `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. This repo does not have them yet, so CI cannot deploy. Deploy from a machine with `wrangler` logged in.
+
+D1 `casa` (`06906658-5515-4f5d-9064-b5a65a01bc2e`) and R2 `casa-images` already exist. Do not create another database or bucket.
+
+Live: https://casa-web.hi-c3a.workers.dev — `/generate` runs the same OpenAI / Gemini prompt engine as canvas. Edit-scene and Whisper stay 501.
 
 ## Deploy
 
@@ -90,4 +93,4 @@ apps/web      product (React Router 8 SSR Worker)
 apps/canvas   reference tldraw / Next.js app
 ```
 
-Generate / edit / Whisper engines stay in canvas. `/api/generate-scene` on web is still 501.
+Generate on web copies the canvas prompt engine into `apps/web/app/lib/generate/` (no Next.js, no tldraw). Edit-scene and Whisper stay 501.
