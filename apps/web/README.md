@@ -1,27 +1,24 @@
 # @casa/web
 
-De-facto Casa product. One React Router 8 SSR Worker, same shape as `web/` in joga-app.
+One React Router 8 SSR Worker. Better Auth + D1 + Drizzle + R2, same family as joga-app `web/` / backend, without a second Hono service.
 
 ```bash
-# from repo root
+cp .dev.vars.example .dev.vars
+pnpm --filter @casa/web db:migrate
 pnpm --filter @casa/web dev
 ```
 
-Open the URL Vite prints (usually http://localhost:5173).
+Sign up at `/sign-up`, then `/generate`. Uploads go to R2. The gallery is per user. Working-set slots (Base / References / Inspirations) pick from that gallery. Generate stays disabled.
 
 ```bash
 pnpm --filter @casa/web deploy
-# react-router build && wrangler deploy
 ```
 
-CI (`.github/workflows/deploy.yml`) is the joga-app path: install, build, `npx wrangler deploy` on `main` or `workflow_dispatch`. Needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+CI applies D1 migrations remotely, then `npx wrangler deploy`. GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 
-OpenAI / Gemini keys are Worker secrets, not GitHub secrets:
+Worker secrets:
 
 ```bash
-cd apps/web
-npx wrangler secret put OPENAI_API_KEY
-npx wrangler secret put GEMINI_API_KEY
+npx wrangler secret put BETTER_AUTH_SECRET
+npx wrangler secret put BETTER_AUTH_URL
 ```
-
-Copy `.dev.vars.example` to `.dev.vars` for local calls later.

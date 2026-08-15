@@ -1,55 +1,53 @@
-import { Link } from "react-router";
+import type { Route } from "./+types/generate";
 
-export default function Generate() {
+import { WorkingSetStudio } from "~/components/working-set-studio";
+import { getEnv } from "~/lib/env.server";
+import { listUserImages, storeUpload } from "~/lib/images.server";
+import { requireUser } from "~/lib/session.server";
+
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const user = await requireUser(request, context);
+  const images = await listUserImages(getEnv(context), user.id);
+  return {
+    user: { name: user.name, email: user.email },
+    images,
+  };
+}
+
+export async function action({ request, context }: Route.ActionArgs) {
+  const user = await requireUser(request, context);
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") ?? "");
+
+  if (intent !== "upload") {
+    return { error: "Unknown action." };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose an image to upload." };
+  }
+
+  try {
+    await storeUpload({
+      env: getEnv(context),
+      userId: user.id,
+      file,
+    });
+    return { ok: true };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Upload failed.",
+    };
+  }
+}
+
+export default function Generate({ loaderData }: Route.ComponentProps) {
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <p className="text-sm">
-        <Link to="/" className="text-[var(--color-accent)]">
-          Casa
-        </Link>
-      </p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight">Generate</h1>
-      <p className="mt-3 text-[var(--color-muted)]">
-        Placeholder page. Scene generation, edits, prompt history, and voice
-        input are not wired yet. The working implementations still live in
-        <code> apps/canvas</code>.
-      </p>
-
-      <section className="mt-10 rounded-lg border border-[var(--color-muted)]/30 p-5">
-        <h2 className="text-lg font-medium">Prompt</h2>
-        <textarea
-          disabled
-          rows={4}
-          placeholder="Describe the room you want to generate"
-          className="mt-3 w-full resize-y rounded-md border border-[var(--color-muted)]/40 bg-transparent px-3 py-2 text-[var(--color-ink)] placeholder:text-[var(--color-muted)] disabled:opacity-60"
-        />
-        <p className="mt-3 text-sm text-[var(--color-muted)]">
-          TODO: prompt history. Persist recent prompts and let the user reuse
-          them. Seam: <code>POST/GET /api/prompt-history</code>.
-        </p>
-        <p className="mt-2 text-sm text-[var(--color-muted)]">
-          TODO: voice prompt. Record audio and send it to{" "}
-          <code>POST /api/transcribe</code>, then fill this field.
-        </p>
-        <button
-          type="button"
-          disabled
-          className="mt-5 rounded-md bg-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-page)] disabled:opacity-50"
-        >
-          Generate (not implemented)
-        </button>
-      </section>
-
-      <ul className="mt-8 list-disc space-y-2 pl-5 text-sm text-[var(--color-muted)]">
-        <li>
-          TODO: generate-scene. Call <code>POST /api/generate-scene</code> with
-          images + prompt. Port from <code>apps/canvas/app/api/generate-scene</code>.
-        </li>
-        <li>
-          TODO: edit-scene. Call <code>POST /api/edit-scene</code> for masked
-          edits. Port from <code>apps/canvas/app/api/edit-scene</code>.
-        </li>
-      </ul>
-    </main>
+    <WorkingSetStudio
+      userName={loaderData.user.name}
+      userEmail={loaderData.user.email}
+      images={loaderData.images}
+    />
   );
 }

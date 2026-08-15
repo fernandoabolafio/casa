@@ -1,6 +1,9 @@
-# Copy to apps/web/.dev.vars for local wrangler / Vite Workers runtime.
-# Same names as the canvas app. Do not commit the real file.
+# Copy to apps/web/.dev.vars (gitignored). Used by `react-router dev`.
+# If Vite falls back to 5174, either free 5173 or set BETTER_AUTH_URL to that origin.
 
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=
-# GOOGLE_API_KEY=
+BETTER_AUTH_SECRET=dev-only-change-me-use-at-least-32-chars
+BETTER_AUTH_URL=http://localhost:5173
+
+# Later, when generate-scene is wired:
+# OPENAI_API_KEY=sk-...
+# GEMINI_API_KEY=
