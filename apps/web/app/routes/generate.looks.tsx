@@ -1,0 +1,144 @@
+import { Link, redirect, useNavigate } from "react-router";
+
+import type { Route } from "./+types/generate.looks";
+
+import { CloseIcon, PlusIcon } from "~/components/icons";
+import { ComposeChrome } from "~/components/compose-chrome";
+import { LibraryPicker } from "~/components/library-picker";
+import { LOOK_CAP, composePath, parseCompose } from "~/lib/compose";
+import { getEnv } from "~/lib/env.server";
+import {
+  getOwnedImage,
+  listUserImages,
+  type GalleryImage,
+} from "~/lib/images.server";
+import { requirePageUser } from "~/lib/require-auth";
+
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const user = await requirePageUser(request, context);
+  const env = getEnv(context);
+  const compose = parseCompose(new URL(request.url));
+  if (!compose.baseId) {
+    throw redirect(composePath("room", compose));
+  }
+
+  const base = await getOwnedImage(env, user.id, compose.baseId);
+  if (!base) {
+    throw redirect(composePath("room", { ...compose, baseId: null }));
+  }
+
+  const images = await listUserImages(env, user.id);
+  const selectedLooks = compose.lookIds
+    .map((id) => images.find((item) => item.id === id))
+    .filter((item): item is GalleryImage => Boolean(item));
+
+  return {
+    images,
+    compose: { ...compose, lookIds: selectedLooks.map((item) => item.id) },
+    selectedLooks,
+  };
+}
+
+export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
+  const navigate = useNavigate();
+  const { images, compose, selectedLooks } = loaderData;
+
+  function go(nextLooks: string[]) {
+    navigate(
+      composePath("looks", {
+        ...compose,
+        lookIds: nextLooks,
+      }),
+      { replace: true },
+    );
+  }
+
+  function addLook(image: GalleryImage) {
+    if (compose.lookIds.includes(image.id)) {
+      go(compose.lookIds.filter((id) => id !== image.id));
+      return;
+    }
+    if (compose.lookIds.length >= LOOK_CAP) {
+      return;
+    }
+    go([...compose.lookIds, image.id]);
+  }
+
+  const mosaicHref = composePath("mosaic", compose);
+
+  return (
+    <ComposeChrome stepLabel="2 of 3 · Look">
+      <h1 className="mt-10 text-4xl font-semibold tracking-tight">
+        Steal a look
+      </h1>
+      <p className="mt-2 text-sm text-[var(--color-muted)]">
+        Style only. Will not move your windows.
+      </p>
+
+      <section className="mt-8">
+        <p className="text-sm text-[var(--color-muted)]">
+          Selected ({selectedLooks.length})
+        </p>
+        <ul className="mt-3 flex flex-wrap gap-3">
+          {selectedLooks.map((item) => (
+            <li
+              key={item.id}
+              className="relative h-28 w-36 overflow-hidden rounded-md border border-[var(--color-muted)]/30"
+            >
+              <img
+                src={item.url}
+                alt={item.filename}
+                className="h-full w-full object-cover"
+              />
+              <button
+                type="button"
+                aria-label={`Remove ${item.filename}`}
+                onClick={() =>
+                  go(compose.lookIds.filter((id) => id !== item.id))
+                }
+                className="absolute right-1 top-1 rounded-full bg-[var(--color-page)]/80 p-1"
+              >
+                <CloseIcon />
+              </button>
+            </li>
+          ))}
+          {selectedLooks.length < LOOK_CAP ? (
+            <li className="flex h-28 w-36 items-center justify-center rounded-md border border-dashed border-[var(--color-muted)]/50 text-[var(--color-muted)]">
+              <PlusIcon />
+            </li>
+          ) : null}
+        </ul>
+      </section>
+
+      <div className="mt-8">
+        <LibraryPicker
+          images={images}
+          selectedIds={compose.lookIds}
+          mode="multi"
+          uploadLabel="Upload a look"
+          showActions={false}
+          onUploaded={addLook}
+          onSelect={addLook}
+        />
+      </div>
+
+      <div className="mt-10 flex items-center justify-end gap-4">
+        <Link
+          to={composePath("mosaic", { ...compose, lookIds: [] })}
+          className="text-sm text-[var(--color-muted)] underline"
+        >
+          Skip
+        </Link>
+        <Link
+          to={mosaicHref}
+          className="rounded-md bg-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-page)]"
+        >
+          Continue
+        </Link>
+      </div>
+      <p className="mt-2 text-right text-xs text-[var(--color-muted)]">
+        Optional. Skip is valid.
+      </p>
+    </ComposeChrome>
+  );
+}

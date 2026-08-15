@@ -8,7 +8,7 @@ pnpm --filter @casa/web db:migrate
 pnpm --filter @casa/web dev
 ```
 
-Sign up at `/sign-up`, then `/generate`. Uploads are Worker `IMAGES.put` after `requireAuth`. The gallery is per user. Working-set slots pick from that gallery. Generate loads those R2 bytes and writes the PNG back as `kind: generation`.
+Sign up at `/sign-up`. First visit with no jobs goes to `/generate/room`. Uploads are Worker `IMAGES.put` after `requireAuth`. Library pickers split Uploads and Generations. Generate inserts a `generation` row, starts the `GENERATE_SCENE` workflow, and sends you to `/`. The workflow loads owned R2 bytes, runs `app/lib/generate/`, writes a PNG as `kind: generation`, and marks the job done.
 
 ```bash
 pnpm --filter @casa/web deploy
@@ -22,7 +22,7 @@ Live: https://casa-web.hi-c3a.workers.dev
 
 `OPENAI_API_KEY` and `GEMINI_API_KEY` are Worker secrets, not repo or GitHub secrets. Edit-scene and Whisper stay 501.
 
-Vars in `wrangler.jsonc` (override in `.dev.vars` locally): `BETTER_AUTH_URL`, `PUBLIC_WEB_URL`. After the first production deploy, set both to the `casa-web` workers.dev URL.
+Vars in `wrangler.jsonc` (override in `.dev.vars` locally): `BETTER_AUTH_URL` and `PUBLIC_WEB_URL` are the live workers.dev URL.
 
 Worker secret:
 

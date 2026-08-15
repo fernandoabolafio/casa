@@ -29,5 +29,12 @@
       "binding": "IMAGES",
       "bucket_name": "casa-images"
     }
+  ],
+  "workflows": [
+    {
+      "name": "casa-generate-scene",
+      "binding": "GENERATE_SCENE",
+      "class_name": "GenerateSceneWorkflow"
+    }
   ]
 }

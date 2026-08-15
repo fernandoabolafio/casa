@@ -4,6 +4,7 @@ declare namespace Cloudflare {
   interface Env {
     DB: D1Database;
     IMAGES: R2Bucket;
+    GENERATE_SCENE: Workflow<{ jobId: string }>;
     BETTER_AUTH_SECRET: string;
     BETTER_AUTH_URL: string;
     PUBLIC_WEB_URL: string;

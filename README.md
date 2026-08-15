@@ -26,7 +26,7 @@ pnpm --filter @casa/web db:migrate
 pnpm --filter @casa/web dev
 ```
 
-Open http://localhost:5173. Sign up, then `/generate` to upload images, pick a working set, and generate. Local generate needs `OPENAI_API_KEY` / `GEMINI_API_KEY` in `.dev.vars`.
+Open http://localhost:5173. Sign up. First visit lands on `/generate/room`. Local generate needs `OPENAI_API_KEY` / `GEMINI_API_KEY` in `.dev.vars`.
 
 Local D1 and R2 are Wrangler's emulators. `db:migrate` applies `apps/web/drizzle` to the local `casa` database.
 
@@ -53,7 +53,7 @@ Copied from [joga-app](https://github.com/fernandoabolafio/joga-app). Casa keeps
 | Hono `auth.handler` mount | `apps/web/app/routes/api.auth.$.ts` |
 | Worker `env.<BUCKET>.put` after requireAuth | `apps/web/app/lib/images.server.ts` |
 
-Vars in `apps/web/wrangler.jsonc`: `BETTER_AUTH_URL`, `PUBLIC_WEB_URL`. Set them to the Worker URL before production.
+Vars in `apps/web/wrangler.jsonc`: `BETTER_AUTH_URL` and `PUBLIC_WEB_URL` are https://casa-web.hi-c3a.workers.dev. Local `.dev.vars` still uses localhost.
 
 Worker secret (not GitHub):
 
@@ -70,7 +70,19 @@ GitHub secrets stay `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. This rep
 
 D1 `casa` (`06906658-5515-4f5d-9064-b5a65a01bc2e`) and R2 `casa-images` already exist. Do not create another database or bucket.
 
-Live: https://casa-web.hi-c3a.workers.dev — `/generate` runs the same OpenAI / Gemini prompt engine as canvas. Edit-scene and Whisper stay 501.
+Live: https://casa-web.hi-c3a.workers.dev
+
+`/` is the job list after the first generate. Compose is `/generate/room`, `/generate/looks`, `/generate/mosaic`. Generate starts the `casa-generate-scene` Cloudflare Workflow and returns to Home with a Running job. The prompt engine is still `apps/web/app/lib/generate/`. Edit-scene and Whisper stay 501.
+
+After you pull this branch, apply the new D1 migration and deploy from a logged-in box:
+
+```bash
+cd apps/web
+npx wrangler d1 migrations apply casa --remote
+npx wrangler deploy
+```
+
+The workflow binding is already in `wrangler.jsonc` (`GENERATE_SCENE` / `GenerateSceneWorkflow` / `casa-generate-scene`). First deploy registers it. No new secrets.
 
 ## Deploy
 

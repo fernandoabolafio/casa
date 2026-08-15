@@ -2,7 +2,12 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
   index("routes/home.tsx"),
-  route("generate", "routes/generate.tsx"),
+  route("generate", "routes/generate.tsx", [
+    index("routes/generate._index.tsx"),
+    route("room", "routes/generate.room.tsx"),
+    route("looks", "routes/generate.looks.tsx"),
+    route("mosaic", "routes/generate.mosaic.tsx"),
+  ]),
   route("sign-in", "routes/sign-in.tsx"),
   route("sign-up", "routes/sign-up.tsx"),
   route("api/auth/*", "routes/api.auth.$.ts"),

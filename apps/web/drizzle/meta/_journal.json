@@ -15,6 +15,13 @@
       "when": 1755252001000,
       "tag": "0001_casa_images",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1755252002000,
+      "tag": "0002_generations",
+      "breakpoints": true
     }
   ]
 }

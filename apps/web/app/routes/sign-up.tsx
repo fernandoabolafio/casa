@@ -6,7 +6,7 @@ import { AuthForm } from "~/components/auth-form";
 import { getSession } from "~/lib/require-auth";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const nextPath = new URL(request.url).searchParams.get("next") ?? "/generate";
+  const nextPath = new URL(request.url).searchParams.get("next") ?? "/";
   const user = await getSession(request, context);
   if (user) {
     throw redirect(nextPath);

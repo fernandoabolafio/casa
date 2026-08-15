@@ -85,3 +85,34 @@ export const image = sqliteTable(
   },
   (table) => [index("image_user_id_idx").on(table.userId)],
 );
+
+export const generationStatus = ["running", "done", "failed"] as const;
+export type GenerationStatus = (typeof generationStatus)[number];
+
+export const generation = sqliteTable(
+  "generation",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    status: text("status", { enum: generationStatus }).notNull(),
+    baseImageId: text("base_image_id")
+      .notNull()
+      .references(() => image.id),
+    inspirationIds: text("inspiration_ids").notNull(),
+    prompt: text("prompt").notNull(),
+    provider: text("provider").notNull(),
+    structureLock: integer("structure_lock", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    resultImageId: text("result_image_id").references(() => image.id),
+    error: text("error"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("generation_user_id_idx").on(table.userId),
+    index("generation_user_created_idx").on(table.userId, table.createdAt),
+  ],
+);
