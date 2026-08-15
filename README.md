@@ -20,7 +20,7 @@ Do not use npm or bun at the root. `pnpm-lock.yaml` is the lockfile.
 ```bash
 cp apps/web/.dev.vars.example apps/web/.dev.vars
 # BETTER_AUTH_SECRET must be at least 32 characters
-# BETTER_AUTH_URL=http://localhost:5173
+# BETTER_AUTH_URL and PUBLIC_WEB_URL default to http://localhost:5173
 
 pnpm --filter @casa/web db:migrate
 pnpm --filter @casa/web dev
@@ -28,7 +28,7 @@ pnpm --filter @casa/web dev
 
 Open http://localhost:5173. Sign up, then `/generate` to upload images and pick a working set.
 
-Local D1 and R2 are Wrangler's emulators. `db:migrate` applies `apps/web/drizzle/migrations` to the local `casa` database.
+Local D1 and R2 are Wrangler's emulators. `db:migrate` applies `apps/web/drizzle` to the local `casa` database.
 
 Legacy canvas (tldraw):
 
@@ -41,24 +41,31 @@ Canvas listens on http://localhost:3000.
 
 ## Auth, D1, R2
 
-Same family as `web/` + backend in [joga-app](https://github.com/fernandoabolafio/joga-app): Better Auth, Drizzle, D1, R2. Casa keeps that on **one** Worker (no Hono service). joga-app is private from this agent, so the files copied by shape are:
+Copied from [joga-app](https://github.com/fernandoabolafio/joga-app). Casa keeps auth on this same Worker. Joga only split Hono for iOS/video, not for Better Auth.
 
-- Better Auth + Drizzle adapter (`@better-auth/drizzle-adapter`)
-- D1 binding + `migrations_dir` in `wrangler.jsonc`
-- `wrangler d1 migrations apply … --remote` before `npx wrangler deploy`
-- R2 binding for bytes; metadata in D1
-- GitHub secrets stay `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
+| joga-app | Casa |
+|---|---|
+| `backend/src/auth.ts` | `apps/web/app/lib/auth.server.ts` |
+| `backend/src/middleware/auth.ts` | `apps/web/app/lib/require-auth.ts` |
+| `web/app/lib/auth.ts` | `apps/web/app/lib/auth.ts` |
+| `backend/src/db/schema.ts` (user/session/account/verification) | `apps/web/app/db/schema.ts` |
+| `backend/drizzle/0000_wild_warhawk.sql` | `apps/web/drizzle/0000_wild_warhawk.sql` |
+| Hono `auth.handler` mount | `apps/web/app/routes/api.auth.$.ts` |
+| Worker `env.<BUCKET>.put` after requireAuth | `apps/web/app/lib/images.server.ts` |
 
-Worker secrets (not GitHub):
+Vars in `apps/web/wrangler.jsonc`: `BETTER_AUTH_URL`, `PUBLIC_WEB_URL`. Set them to the Worker URL before production.
+
+Worker secret (not GitHub):
 
 ```bash
 cd apps/web
 npx wrangler secret put BETTER_AUTH_SECRET
-npx wrangler secret put BETTER_AUTH_URL
 # later
 npx wrangler secret put OPENAI_API_KEY
 npx wrangler secret put GEMINI_API_KEY
 ```
+
+GitHub secrets stay `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
 Before the first remote deploy, create the D1 database and R2 bucket, then put the real D1 id in `apps/web/wrangler.jsonc` (placeholder `00000000-0000-0000-0000-000000000000` is local-only):
 

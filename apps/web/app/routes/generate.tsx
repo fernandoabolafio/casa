@@ -3,10 +3,10 @@ import type { Route } from "./+types/generate";
 import { WorkingSetStudio } from "~/components/working-set-studio";
 import { getEnv } from "~/lib/env.server";
 import { listUserImages, storeUpload } from "~/lib/images.server";
-import { requireUser } from "~/lib/session.server";
+import { requirePageUser } from "~/lib/require-auth";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const user = await requireUser(request, context);
+  const user = await requirePageUser(request, context);
   const images = await listUserImages(getEnv(context), user.id);
   return {
     user: { name: user.name, email: user.email },
@@ -15,7 +15,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  const user = await requireUser(request, context);
+  const user = await requirePageUser(request, context);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
 

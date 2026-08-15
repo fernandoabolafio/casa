@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
 
-import { authClient } from "~/lib/auth-client";
+import { signInEmail, signUpEmail } from "~/lib/auth";
 
 type AuthMode = "sign-in" | "sign-up";
 
@@ -27,19 +27,20 @@ export function AuthForm({
     setError(null);
     setPending(true);
 
-    const result =
-      mode === "sign-up"
-        ? await authClient.signUp.email({ email, password, name })
-        : await authClient.signIn.email({ email, password });
-
-    setPending(false);
-
-    if (result.error) {
-      setError(result.error.message ?? "Authentication failed.");
-      return;
+    try {
+      if (mode === "sign-up") {
+        await signUpEmail(name, email, password);
+      } else {
+        await signInEmail(email, password);
+      }
+      navigate(nextPath);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Authentication failed.",
+      );
+    } finally {
+      setPending(false);
     }
-
-    navigate(nextPath);
   }
 
   return (

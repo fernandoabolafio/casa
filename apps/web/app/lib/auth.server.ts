@@ -1,5 +1,6 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
+import { bearer } from "better-auth/plugins";
 
 import { createDb } from "~/db/client";
 import * as schema from "~/db/schema";
@@ -10,37 +11,33 @@ export type SessionUser = {
   email: string;
 };
 
-function collectTrustedOrigins(env: Env, request: Request) {
-  const origins = new Set<string>();
-  const add = (value: string | null | undefined) => {
-    if (value) {
-      origins.add(value);
-    }
-  };
+// Copied from joga-app `backend/src/auth.ts`: betterAuth + drizzleAdapter
+// (sqlite) + emailAndPassword + bearer() + basePath "/api/auth".
+// Casa mounts this on the same RR worker instead of a Hono service.
+export function createAuth(env: Env, request?: Request) {
+  const requestOrigin = request ? new URL(request.url).origin : undefined;
+  const trustedOrigins = [
+    env.PUBLIC_WEB_URL,
+    env.BETTER_AUTH_URL,
+    requestOrigin,
+    request?.headers.get("origin") ?? undefined,
+  ].filter((value, index, list): value is string => {
+    return Boolean(value) && list.indexOf(value) === index;
+  });
 
-  add(env.BETTER_AUTH_URL);
-  add(new URL(request.url).origin);
-  add(request.headers.get("origin"));
-  add("http://localhost:5173");
-  add("http://localhost:5174");
-  add("http://127.0.0.1:5173");
-  add("http://127.0.0.1:5174");
-  return [...origins];
-}
-
-export function createAuth(env: Env, request: Request) {
-  const origin = new URL(request.url).origin;
   const auth = betterAuth({
     database: drizzleAdapter(createDb(env), {
       provider: "sqlite",
       schema,
     }),
     secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.BETTER_AUTH_URL || origin,
+    baseURL: env.BETTER_AUTH_URL || requestOrigin,
+    basePath: "/api/auth",
+    trustedOrigins,
     emailAndPassword: {
       enabled: true,
     },
-    trustedOrigins: collectTrustedOrigins(env, request),
+    plugins: [bearer()],
   });
 
   return {

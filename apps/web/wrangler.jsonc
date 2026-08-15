@@ -8,18 +8,18 @@
     "enabled": true
   },
   "upload_source_maps": true,
-  // Public URLs go here. Secrets stay on the Worker:
-  //   wrangler secret put BETTER_AUTH_SECRET
-  //   wrangler secret put BETTER_AUTH_URL
-  //   wrangler secret put OPENAI_API_KEY
-  //   wrangler secret put GEMINI_API_KEY
-  "vars": {},
+  // Vars (not secrets). Point these at the Worker URL in production.
+  // Secret: wrangler secret put BETTER_AUTH_SECRET
+  "vars": {
+    "BETTER_AUTH_URL": "http://localhost:5173",
+    "PUBLIC_WEB_URL": "http://localhost:5173"
+  },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "casa",
       "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "drizzle/migrations"
+      "migrations_dir": "drizzle"
     }
   ],
   "r2_buckets": [

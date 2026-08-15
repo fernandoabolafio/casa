@@ -1,7 +1,8 @@
-# Same shape as fernandoabolafio/joga-app `.github/workflows/deploy.yml`:
-# push main + workflow_dispatch, Node 22, install, build, `npx wrangler deploy`.
-# Secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
-# OpenAI/Gemini keys are `wrangler secret put` on the Worker, not workflow secrets.
+# Same shape as fernandoabolafio/joga-app deploy-backend:
+# push main + workflow_dispatch, Node 22, install, build,
+# `wrangler d1 migrations apply <db> --remote`, then `npx wrangler deploy`.
+# GitHub secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
+# BETTER_AUTH_SECRET is `wrangler secret put`. URLs are wrangler vars.
 
 name: Deploy
 

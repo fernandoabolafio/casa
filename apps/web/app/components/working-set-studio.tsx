@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Form, useActionData, useNavigation } from "react-router";
 
-import { authClient } from "~/lib/auth-client";
+import { signOut } from "~/lib/auth";
 import type { GalleryImage } from "~/lib/images.server";
 
 type WorkingRole = "base" | "reference" | "inspiration";
@@ -101,9 +101,7 @@ export function WorkingSetStudio({
           type="button"
           className="text-sm text-[var(--color-muted)] underline"
           onClick={() => {
-            void authClient.signOut({
-              fetchOptions: { onSuccess: () => window.location.assign("/") },
-            });
+            void signOut().then(() => window.location.assign("/"));
           }}
         >
           Sign out

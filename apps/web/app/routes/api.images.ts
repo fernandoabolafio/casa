@@ -2,23 +2,16 @@ import type { Route } from "./+types/api.images";
 
 import { getEnv } from "~/lib/env.server";
 import { listUserImages, storeUpload } from "~/lib/images.server";
-import { getOptionalUser } from "~/lib/session.server";
+import { requireAuth } from "~/lib/require-auth";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const user = await getOptionalUser(request, context);
-  if (!user) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
-  }
-
+  const user = await requireAuth(request, context);
   const images = await listUserImages(getEnv(context), user.id);
   return Response.json({ images });
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  const user = await getOptionalUser(request, context);
-  if (!user) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const user = await requireAuth(request, context);
   if (request.method !== "POST") {
     return Response.json({ error: "method_not_allowed" }, { status: 405 });
   }

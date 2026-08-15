@@ -68,9 +68,9 @@ export async function storeUpload(input: {
 
   const id = crypto.randomUUID();
   const r2Key = `${userId}/${id}`;
-  const bytes = await file.arrayBuffer();
 
-  await env.IMAGES.put(r2Key, bytes, {
+  // Joga uploads are Worker PUT after requireAuth, not presigned S3.
+  await env.IMAGES.put(r2Key, await file.arrayBuffer(), {
     httpMetadata: { contentType: file.type },
   });
 

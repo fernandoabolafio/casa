@@ -2,10 +2,10 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/home";
 
-import { getOptionalUser } from "~/lib/session.server";
+import { getSession } from "~/lib/require-auth";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const user = await getOptionalUser(request, context);
+  const user = await getSession(request, context);
   return { signedIn: Boolean(user) };
 }
 

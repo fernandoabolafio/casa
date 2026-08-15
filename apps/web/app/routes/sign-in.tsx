@@ -3,11 +3,11 @@ import { redirect } from "react-router";
 import type { Route } from "./+types/sign-in";
 
 import { AuthForm } from "~/components/auth-form";
-import { getOptionalUser } from "~/lib/session.server";
+import { getSession } from "~/lib/require-auth";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const nextPath = new URL(request.url).searchParams.get("next") ?? "/generate";
-  const user = await getOptionalUser(request, context);
+  const user = await getSession(request, context);
   if (user) {
     throw redirect(nextPath);
   }
