@@ -2,12 +2,12 @@
 
 pnpm workspace. Two apps:
 
-- `apps/web` (`@casa/web`) is the product. React Router v8 on Cloudflare Workers.
+- `apps/web` (`@casa/web`) is the product. One React Router 8 SSR Worker.
 - `apps/canvas` (`@casa/canvas`) is the original Next.js + tldraw board. Reference only. It still runs and still has generate / edit / Whisper. It will be phased out later, not deleted.
 
 ## Install
 
-Node 20.9 or newer for the repo. `@casa/web` is React Router 8 and needs Node 22.22 or newer. pnpm 9 or newer.
+Node 20.9 or newer for the repo. `@casa/web` is React Router 8 and needs Node 22. pnpm 9 or newer.
 
 ```bash
 pnpm install
@@ -36,20 +36,28 @@ Canvas listens on http://localhost:3000. Web uses the Vite / Workers port Vite p
 
 ## Deploy
 
-`apps/web` uses Wrangler and `@cloudflare/vite-plugin`, same path as [Cloudflare's React Router guide](https://developers.cloudflare.com/workers/framework-guides/web-apps/react-router/).
+`apps/web` is one Worker. Same path as `web/` in [joga-app](https://github.com/fernandoabolafio/joga-app): `workers/app.ts`, `wrangler.jsonc` with `nodejs_compat`, `react-router dev` locally, build then `npx wrangler deploy` in production.
 
 ```bash
 pnpm --filter @casa/web deploy
 ```
 
-CI deploys `@casa/web` on push to `main`. Repo secrets:
+CI (`.github/workflows/deploy.yml`) matches joga-app: push `main` or `workflow_dispatch`, Node 22, install, build `@casa/web`, `npx wrangler deploy`. Repo secrets:
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-Those names are the ones Cloudflare documents for `wrangler-action`.
+OpenAI / Gemini keys are not workflow secrets. Set them on the Worker:
 
-Canvas still uses OpenNext + Wrangler (`apps/canvas/wrangler.jsonc`), unchanged:
+```bash
+cd apps/web
+npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put GEMINI_API_KEY
+```
+
+Public URLs can go in `apps/web/wrangler.jsonc` `vars`. No custom domain yet. `workers.dev` is fine.
+
+Canvas still uses OpenNext + Wrangler (`apps/canvas/wrangler.jsonc`). This PR does not change that path. CI deploys the new RR app only.
 
 ```bash
 pnpm --filter @casa/canvas deploy
@@ -58,7 +66,7 @@ pnpm --filter @casa/canvas deploy
 ## Layout
 
 ```
-apps/web      product (React Router v8 + Workers)
+apps/web      product (React Router 8 SSR Worker)
 apps/canvas   reference tldraw / Next.js app
 ```
 

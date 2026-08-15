@@ -1,15 +1,7 @@
-# Deploy the product app to Cloudflare Workers.
-# Secrets match Cloudflare's wrangler CI docs (and wrangler-action):
-#   CLOUDFLARE_API_TOKEN
-#   CLOUDFLARE_ACCOUNT_ID
-#
-# Preview-on-PR is not wired. Fernando's public CF apps (warranty-wallet,
-# snapframe-landing, casa itself) deploy from the machine / wrangler, not
-# from a PR preview workflow.
-#
-# Legacy canvas still deploys with:
-#   pnpm --filter @casa/canvas deploy
-# (OpenNext + wrangler, same as before this monorepo.)
+# Same shape as fernandoabolafio/joga-app `.github/workflows/deploy.yml`:
+# push main + workflow_dispatch, Node 22, install, build, `npx wrangler deploy`.
+# Secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
+# OpenAI/Gemini keys are `wrangler secret put` on the Worker, not workflow secrets.
 
 name: Deploy
 
@@ -17,14 +9,14 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
-  deploy-web:
-    name: Deploy @casa/web
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
         with:
@@ -32,17 +24,18 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.22"
+          node-version: 22
           cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/web
-          packageManager: pnpm
-          command: deploy
+      - name: Build
+        run: pnpm --filter @casa/web build
+
+      - name: Deploy
+        working-directory: apps/web
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

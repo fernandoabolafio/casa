@@ -10,7 +10,7 @@
     "dev": "react-router dev",
     "build": "react-router build",
     "preview": "pnpm build && vite preview",
-    "deploy": "wrangler deploy",
+    "deploy": "react-router build && wrangler deploy",
     "typecheck": "react-router typegen && tsc -b",
     "cf-typegen": "wrangler types && react-router typegen"
   },
