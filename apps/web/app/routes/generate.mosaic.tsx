@@ -4,6 +4,7 @@ import {
   Link,
   redirect,
   useActionData,
+  useNavigate,
   useNavigation,
 } from "react-router";
 
@@ -11,6 +12,7 @@ import type { Route } from "./+types/generate.mosaic";
 
 import { ComposeChrome } from "~/components/compose-chrome";
 import { CloseIcon, LockIcon, PlusIcon, SparkleIcon } from "~/components/icons";
+import { LibraryModal } from "~/components/library-picker";
 import { LOOK_CAP, composePath, parseCompose, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import { enqueueGeneration } from "~/lib/generate/start";
@@ -57,6 +59,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     },
     base,
     looks,
+    images,
   };
 }
 
@@ -101,16 +104,35 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
-  const { compose, base, looks } = loaderData;
+  const { compose, base, looks, images } = loaderData;
   const actionData = useActionData<typeof action>();
+  const navigate = useNavigate();
   const navigation = useNavigation();
   const submitting = navigation.state !== "idle";
   const [prompt, setPrompt] = useState("");
   const [provider, setProvider] = useState<"openai" | "gemini">("openai");
   const [structureLock, setStructureLock] = useState(compose.structureLock);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const roomHref = composePath("room", { ...compose, structureLock });
-  const looksHref = composePath("looks", { ...compose, structureLock });
+
+  function setLooks(lookIds: string[]) {
+    navigate(
+      composePath("mosaic", { ...compose, structureLock, lookIds }),
+      { replace: true },
+    );
+  }
+
+  function addLook(image: GalleryImage) {
+    if (compose.lookIds.includes(image.id)) {
+      setLooks(compose.lookIds.filter((id) => id !== image.id));
+      return;
+    }
+    if (compose.lookIds.length >= LOOK_CAP) {
+      return;
+    }
+    setLooks([...compose.lookIds, image.id]);
+  }
 
   return (
     <ComposeChrome>
@@ -174,18 +196,27 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
             ))}
             {looks.length < LOOK_CAP ? (
               <li>
-                <Link
-                  to={looksHref}
-                  aria-label="Add a look"
+                <button
+                  type="button"
+                  onClick={() => setLibraryOpen(true)}
+                  aria-label="From library"
                   className="flex h-24 w-28 items-center justify-center rounded-md border border-dashed border-[var(--color-muted)]/50 text-[var(--color-muted)]"
                 >
                   <PlusIcon />
-                </Link>
+                </button>
               </li>
             ) : null}
           </ul>
         </section>
       </div>
+      <LibraryModal
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        images={images}
+        selectedIds={compose.lookIds}
+        mode="multi"
+        onSelect={addLook}
+      />
 
       <Form
         method="post"

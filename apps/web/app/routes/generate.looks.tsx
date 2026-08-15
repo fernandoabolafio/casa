@@ -1,10 +1,15 @@
+import { useState } from "react";
 import { Link, redirect, useNavigate } from "react-router";
 
 import type { Route } from "./+types/generate.looks";
 
 import { CloseIcon, PlusIcon } from "~/components/icons";
 import { ComposeChrome } from "~/components/compose-chrome";
-import { LibraryPicker } from "~/components/library-picker";
+import {
+  FromLibraryButton,
+  LibraryModal,
+  UploadButton,
+} from "~/components/library-picker";
 import { LOOK_CAP, composePath, parseCompose, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import {
@@ -42,6 +47,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
   const { images, compose, selectedLooks } = loaderData;
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   function go(nextLooks: string[]) {
     navigate(
@@ -103,24 +109,32 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
             </li>
           ))}
           {selectedLooks.length < LOOK_CAP ? (
-            <li className="flex h-28 w-36 items-center justify-center rounded-md border border-dashed border-[var(--color-muted)]/50 text-[var(--color-muted)]">
-              <PlusIcon />
+            <li>
+              <button
+                type="button"
+                onClick={() => setLibraryOpen(true)}
+                aria-label="From library"
+                className="flex h-28 w-36 items-center justify-center rounded-md border border-dashed border-[var(--color-muted)]/50 text-[var(--color-muted)]"
+              >
+                <PlusIcon />
+              </button>
             </li>
           ) : null}
         </ul>
       </section>
 
-      <div className="mt-8">
-        <LibraryPicker
-          images={images}
-          selectedIds={compose.lookIds}
-          mode="multi"
-          uploadLabel="Upload a look"
-          showActions={false}
-          onUploaded={addLook}
-          onSelect={addLook}
-        />
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        <UploadButton label="Upload a look" onUploaded={addLook} />
+        <FromLibraryButton onClick={() => setLibraryOpen(true)} />
       </div>
+      <LibraryModal
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        images={images}
+        selectedIds={compose.lookIds}
+        mode="multi"
+        onSelect={addLook}
+      />
 
       <div className="mt-10 flex items-center justify-end gap-4">
         <Link

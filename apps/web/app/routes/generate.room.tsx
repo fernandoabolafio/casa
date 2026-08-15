@@ -1,9 +1,14 @@
+import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import type { Route } from "./+types/generate.room";
 
 import { ComposeChrome } from "~/components/compose-chrome";
-import { LibraryPicker } from "~/components/library-picker";
+import {
+  FromLibraryButton,
+  LibraryModal,
+  UploadButton,
+} from "~/components/library-picker";
 import { composePath, parseCompose, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import {
@@ -35,6 +40,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export default function GenerateRoom({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
   const { images, compose, lastDone, running, now } = loaderData;
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   function pickBase(image: GalleryImage) {
     navigate(
@@ -67,17 +73,24 @@ export default function GenerateRoom({ loaderData }: Route.ComponentProps) {
         />
       ) : null}
 
-      <div className="mt-8">
-        <LibraryPicker
-          images={images}
-          selectedIds={compose.baseId ? [compose.baseId] : []}
-          mode="single"
-          uploadLabel="Upload a photo"
-          emphasizeUpload={images.filter((item) => item.kind === "upload").length === 0}
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        <UploadButton
+          label="Upload a photo"
+          emphasize={
+            images.filter((item) => item.kind === "upload").length === 0
+          }
           onUploaded={pickBase}
-          onSelect={pickBase}
         />
+        <FromLibraryButton onClick={() => setLibraryOpen(true)} />
       </div>
+      <LibraryModal
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        images={images}
+        selectedIds={compose.baseId ? [compose.baseId] : []}
+        mode="single"
+        onSelect={pickBase}
+      />
     </ComposeChrome>
   );
 }
