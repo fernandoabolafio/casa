@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
+import { Wordmark } from "~/components/wordmark";
 import { jobTitle, primaryActionClass } from "~/lib/compose";
 import type { GalleryImage } from "~/lib/images.server";
 import { downloadImage, shareResult } from "~/lib/result-actions";
@@ -66,13 +67,13 @@ export function ResultInspect({
     <main className="mx-auto flex h-dvh max-w-5xl flex-col overflow-hidden px-6 py-4">
       <header className="flex shrink-0 items-center justify-between gap-4">
         {backHref ? (
-          <Link to={backHref} className="text-sm text-[var(--color-muted)]">
+          <Link to={backHref} className="text-sm text-[var(--muted)]">
             Back
           </Link>
         ) : (
-          <p className="text-sm tracking-wide">Casa</p>
+          <Wordmark />
         )}
-        {backHref ? <p className="text-sm tracking-wide">Casa</p> : <span />}
+        {backHref ? <Wordmark /> : <span />}
       </header>
 
       <div className="mt-3 flex min-h-0 flex-1 items-center justify-center">
@@ -85,7 +86,7 @@ export function ResultInspect({
 
       <section className="mt-3 shrink-0 pb-2">
         {prompt.trim() ? (
-          <p className="truncate text-sm text-[var(--color-muted)]">
+          <p className="truncate text-sm text-[var(--muted)]">
             {prompt.trim()}
           </p>
         ) : null}
@@ -113,7 +114,15 @@ export function ResultInspect({
 
         {secondary}
         {status ? (
-          <p className="mt-2 text-sm text-[var(--color-accent)]">{status}</p>
+          <p
+            className={`mt-2 text-sm ${
+              status === "Link copied." || status === "Saved the image."
+                ? "text-[var(--sage)]"
+                : "text-[var(--clay)]"
+            }`}
+          >
+            {status}
+          </p>
         ) : null}
       </section>
     </main>
@@ -140,7 +149,7 @@ function RecipeStrip({
             alt="Base"
             className="h-14 w-16 rounded object-cover"
           />
-          <p className="mt-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-muted)]">
+          <p className="mt-1 text-center text-[10px] uppercase tracking-wide text-[var(--muted)]">
             Base
           </p>
         </li>
@@ -152,7 +161,7 @@ function RecipeStrip({
             alt={item.filename}
             className="h-14 w-16 rounded object-cover"
           />
-          <p className="mt-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-muted)]">
+          <p className="mt-1 text-center text-[10px] uppercase tracking-wide text-[var(--muted)]">
             Look {index + 1}
           </p>
         </li>

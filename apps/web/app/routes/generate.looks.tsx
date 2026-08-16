@@ -10,6 +10,7 @@ import {
   LibraryModal,
   UploadButton,
 } from "~/components/library-picker";
+import { headingClass } from "~/lib/brand";
 import { LOOK_CAP, composePath, parseCompose, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import {
@@ -84,10 +85,10 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
 
   return (
     <ComposeChrome stepLabel="2 of 3 · Look">
-      <h1 className="mt-10 text-4xl font-semibold tracking-tight">
+      <h1 className={`mt-10 text-4xl ${headingClass}`}>
         Steal a look
       </h1>
-      <p className="mt-2 text-sm text-[var(--color-muted)]">
+      <p className="mt-2 text-sm text-[var(--muted)]">
         Style only. Will not move your windows.
       </p>
 
@@ -98,7 +99,7 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
           className="h-14 w-14 rounded-md object-cover"
         />
         <div>
-          <p className="text-xs uppercase tracking-wide text-[var(--color-muted)]">
+          <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
             The room
           </p>
           <p className="truncate text-sm">{base.filename}</p>
@@ -106,14 +107,14 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
       </div>
 
       <section className="mt-8">
-        <p className="text-sm text-[var(--color-muted)]">
+        <p className="text-sm text-[var(--muted)]">
           Selected ({selectedLooks.length})
         </p>
         <ul className="mt-3 flex flex-wrap gap-3">
           {selectedLooks.map((item) => (
             <li
               key={item.id}
-              className="relative h-28 w-36 overflow-hidden rounded-md border border-[var(--color-muted)]/30"
+              className="relative h-28 w-36 overflow-hidden rounded-md border border-[var(--muted)]/30"
             >
               <img
                 src={item.url}
@@ -126,7 +127,7 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
                 onClick={() =>
                   go(compose.lookIds.filter((id) => id !== item.id))
                 }
-                className="absolute right-1 top-1 rounded-full bg-[var(--color-page)]/80 p-1"
+                className="absolute right-1 top-1 rounded-full bg-[var(--plaster)]/80 p-1"
               >
                 <CloseIcon />
               </button>
@@ -138,7 +139,7 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
                 type="button"
                 onClick={() => setLibraryOpen(true)}
                 aria-label="From library"
-                className="flex h-28 w-36 items-center justify-center rounded-md border border-dashed border-[var(--color-muted)]/50 text-[var(--color-muted)]"
+                className="flex h-28 w-36 items-center justify-center rounded-md border border-dashed border-[var(--muted)]/50 text-[var(--muted)]"
               >
                 <PlusIcon />
               </button>
@@ -163,7 +164,7 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
       <div className="mt-10 flex items-center justify-end gap-4">
         <Link
           to={composePath("mosaic", { ...compose, lookIds: [] })}
-          className="text-sm text-[var(--color-muted)] underline"
+          className="text-sm text-[var(--muted)] underline"
         >
           Skip
         </Link>
@@ -174,7 +175,7 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
           Continue
         </Link>
       </div>
-      <p className="mt-2 text-right text-xs text-[var(--color-muted)]">
+      <p className="mt-2 text-right text-xs text-[var(--muted)]">
         Optional. Skip is valid.
       </p>
     </ComposeChrome>

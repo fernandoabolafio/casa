@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
 
+import { Wordmark } from "~/components/wordmark";
 import { signInEmail, signUpEmail } from "~/lib/auth";
+import { headingClass } from "~/lib/brand";
 
 type AuthMode = "sign-in" | "sign-up";
 
 const fieldClass =
-  "mt-2 w-full rounded-md border border-[var(--color-muted)]/40 bg-transparent px-3 py-2 text-[var(--color-ink)] placeholder:text-[var(--color-muted)]";
+  "mt-2 w-full rounded-md border border-[var(--muted)]/40 bg-transparent px-3 py-2 text-[var(--ink)] placeholder:text-[var(--muted)]";
 
 export function AuthForm({
   mode,
@@ -45,15 +47,11 @@ export function AuthForm({
 
   return (
     <main className="mx-auto max-w-md px-6 py-16">
-      <p className="text-sm">
-        <Link to="/" className="text-[var(--color-accent)]">
-          Casa
-        </Link>
-      </p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+      <Wordmark to="/" />
+      <h1 className={`mt-3 text-3xl ${headingClass}`}>
         {mode === "sign-up" ? "Create an account" : "Sign in"}
       </h1>
-      <p className="mt-3 text-[var(--color-muted)]">
+      <p className="mt-3 text-[var(--muted)]">
         Email and password. Images you upload stay on your account.
       </p>
 
@@ -95,11 +93,11 @@ export function AuthForm({
             }
           />
         </label>
-        {error ? <p className="text-sm text-[var(--color-accent)]">{error}</p> : null}
+        {error ? <p className="text-sm text-[var(--clay)]">{error}</p> : null}
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-page)] disabled:opacity-50"
+          className="rounded-md bg-[var(--clay)] px-4 py-2 font-medium text-[var(--plaster)] disabled:opacity-50"
         >
           {pending
             ? "Working…"
@@ -109,13 +107,13 @@ export function AuthForm({
         </button>
       </form>
 
-      <p className="mt-6 text-sm text-[var(--color-muted)]">
+      <p className="mt-6 text-sm text-[var(--muted)]">
         {mode === "sign-up" ? (
           <>
             Already have an account?{" "}
             <Link
               to={`/sign-in?next=${encodeURIComponent(nextPath)}`}
-              className="text-[var(--color-accent)]"
+              className="text-[var(--clay)]"
             >
               Sign in
             </Link>
@@ -125,7 +123,7 @@ export function AuthForm({
             New here?{" "}
             <Link
               to={`/sign-up?next=${encodeURIComponent(nextPath)}`}
-              className="text-[var(--color-accent)]"
+              className="text-[var(--clay)]"
             >
               Create an account
             </Link>

@@ -1,15 +1,17 @@
 import { Link } from "react-router";
 
+import { Wordmark } from "~/components/wordmark";
+import { headingClass } from "~/lib/brand";
 import { primaryActionClass, secondaryActionClass } from "~/lib/compose";
 
 export function Landing() {
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
-      <p className="text-sm tracking-wide text-[var(--color-accent)]">Casa</p>
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight">
+      <Wordmark />
+      <h1 className={`mt-3 text-4xl ${headingClass}`}>
         Home design, from a photo.
       </h1>
-      <p className="mt-4 max-w-lg text-[var(--color-muted)]">
+      <p className="mt-4 max-w-lg text-[var(--muted)]">
         Upload a room photo, generate, pick a winner. That winner is the next
         room.
       </p>
@@ -30,12 +32,12 @@ export function Landing() {
             alt="The generated room"
           />
         </div>
-        <figcaption className="mt-4 text-sm text-[var(--color-muted)]">
+        <figcaption className="mt-4 text-sm text-[var(--muted)]">
           Use as base → next room
         </figcaption>
       </figure>
 
-      <p className="mt-6 max-w-lg text-sm text-[var(--color-muted)]">
+      <p className="mt-6 max-w-lg text-sm text-[var(--muted)]">
         Steal a look — style only, will not move your windows.
       </p>
 
@@ -70,7 +72,7 @@ function ProofShot({
         alt={alt}
         className="aspect-[4/3] w-full rounded-lg object-cover"
       />
-      <p className="mt-2 text-center text-[10px] uppercase tracking-wide text-[var(--color-muted)]">
+      <p className="mt-2 text-center text-[10px] uppercase tracking-wide text-[var(--muted)]">
         {label}
       </p>
     </div>

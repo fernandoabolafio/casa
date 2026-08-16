@@ -9,6 +9,7 @@ import {
   LibraryModal,
   UploadButton,
 } from "~/components/library-picker";
+import { headingClass } from "~/lib/brand";
 import { composePath, parseCompose, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import {
@@ -53,12 +54,12 @@ export default function GenerateRoom({ loaderData }: Route.ComponentProps) {
 
   return (
     <ComposeChrome stepLabel="1 of 3 · The room">
-      <h1 className="mt-10 text-4xl font-semibold tracking-tight">
+      <h1 className={`mt-10 text-4xl ${headingClass}`}>
         What&apos;s the room?
       </h1>
 
       {running ? (
-        <p className="mt-6 text-sm text-[var(--color-accent)]">
+        <p className="mt-6 text-sm text-[var(--lamp)]">
           Last job is still generating. Pick another room.
         </p>
       ) : null}
@@ -110,13 +111,13 @@ function ContinueFromLast({
 }) {
   return (
     <section className="mt-8">
-      <p className="mb-2 text-sm text-[var(--color-accent)]">
+      <p className="mb-2 text-sm text-[var(--lamp)]">
         Continue from last
       </p>
       <button
         type="button"
         onClick={() => onPick(image)}
-        className="flex w-full items-center gap-4 rounded-md border border-[var(--color-accent)] p-3 text-left"
+        className="flex w-full items-center gap-4 rounded-md border border-[var(--lamp)] p-3 text-left"
       >
         <img
           src={image.url}
@@ -127,7 +128,7 @@ function ContinueFromLast({
           <span className="block text-sm">
             {prompt.trim() || image.filename}
           </span>
-          <span className="mt-1 block text-xs text-[var(--color-muted)]">
+          <span className="mt-1 block text-xs text-[var(--muted)]">
             Generated {formatAgo(createdAt, now)}
           </span>
           <span className={`${primaryActionClass} mt-3`}>Continue from last</span>

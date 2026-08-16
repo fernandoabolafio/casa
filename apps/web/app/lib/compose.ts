@@ -2,10 +2,10 @@ export const LOOK_CAP = 4;
 
 /** Same rank as Generate. Use for promote verbs too. */
 export const primaryActionClass =
-  "inline-flex items-center justify-center rounded-md bg-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-page)] disabled:opacity-50";
+  "inline-flex items-center justify-center rounded-md bg-[var(--clay)] px-4 py-2 font-medium text-[var(--plaster)] disabled:opacity-50";
 
 export const secondaryActionClass =
-  "inline-flex items-center justify-center rounded-md border border-[var(--color-ink)]/70 px-4 py-2 text-sm";
+  "inline-flex items-center justify-center rounded-md border border-[var(--ink)]/70 px-4 py-2 text-sm";
 
 export type ComposeStep = "room" | "looks" | "mosaic";
 
