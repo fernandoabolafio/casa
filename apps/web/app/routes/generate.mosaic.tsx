@@ -13,10 +13,16 @@ import type { Route } from "./+types/generate.mosaic";
 import { ComposeChrome } from "~/components/compose-chrome";
 import { CloseIcon, LockIcon, PlusIcon, SparkleIcon } from "~/components/icons";
 import { LibraryModal } from "~/components/library-picker";
-import { LOOK_CAP, composePath, parseCompose, primaryActionClass } from "~/lib/compose";
+import {
+  LOOK_CAP,
+  composePath,
+  parseCompose,
+  primaryActionClass,
+  type ComposeState,
+} from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import { enqueueGeneration } from "~/lib/generate/start";
-import { providerSchema } from "~/lib/generate/scene";
+import { providerSchema, type ImageProvider } from "~/lib/generate/scene";
 import {
   getOwnedImage,
   listUserImages,
@@ -24,10 +30,32 @@ import {
 } from "~/lib/images.server";
 import { requirePageUser } from "~/lib/require-auth";
 
+/** Gemini held room geometry in live walks. Occupant path does not pick a vendor. */
+const DEFAULT_PROVIDER: ImageProvider = "gemini";
+
+function providerFromSearch(url: URL): ImageProvider {
+  const parsed = providerSchema.safeParse(url.searchParams.get("provider"));
+  return parsed.success ? parsed.data : DEFAULT_PROVIDER;
+}
+
+/** Quiet hatch: `?provider=openai` on the mosaic URL. Default Gemini is omitted. */
+function mosaicPath(
+  state: Partial<ComposeState>,
+  provider: ImageProvider,
+): string {
+  const path = composePath("mosaic", state);
+  if (provider === DEFAULT_PROVIDER) {
+    return path;
+  }
+  return `${path}${path.includes("?") ? "&" : "?"}provider=${provider}`;
+}
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = await requirePageUser(request, context);
   const env = getEnv(context);
-  const compose = parseCompose(new URL(request.url));
+  const url = new URL(request.url);
+  const compose = parseCompose(url);
+  const provider = providerFromSearch(url);
   if (!compose.baseId) {
     throw redirect(composePath("room", compose));
   }
@@ -60,6 +88,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     base,
     looks,
     images,
+    provider,
   };
 }
 
@@ -72,11 +101,13 @@ export async function action({ request, context }: Route.ActionArgs) {
   const prompt = String(form.get("prompt") ?? "");
   const lock = String(form.get("structureLock") ?? "1") !== "0";
 
-  let provider: string;
+  let provider: ImageProvider;
   try {
-    provider = providerSchema.parse(String(form.get("provider") ?? "openai"));
+    provider = providerSchema.parse(
+      String(form.get("provider") ?? DEFAULT_PROVIDER),
+    );
   } catch {
-    return { error: "Pick OpenAI or Gemini." };
+    return { error: "Could not start generation." };
   }
 
   if (!baseId) {
@@ -104,13 +135,12 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
-  const { compose, base, looks, images } = loaderData;
+  const { compose, base, looks, images, provider } = loaderData;
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   const navigation = useNavigation();
   const submitting = navigation.state !== "idle";
   const [prompt, setPrompt] = useState("");
-  const [provider, setProvider] = useState<"openai" | "gemini">("openai");
   const [structureLock, setStructureLock] = useState(compose.structureLock);
   const [libraryOpen, setLibraryOpen] = useState(false);
 
@@ -118,7 +148,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
 
   function setLooks(lookIds: string[]) {
     navigate(
-      composePath("mosaic", { ...compose, structureLock, lookIds }),
+      mosaicPath({ ...compose, structureLock, lookIds }, provider),
       { replace: true },
     );
   }
@@ -183,11 +213,14 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
                   className="h-full w-full object-cover"
                 />
                 <Link
-                  to={composePath("mosaic", {
-                    ...compose,
-                    structureLock,
-                    lookIds: compose.lookIds.filter((id) => id !== item.id),
-                  })}
+                  to={mosaicPath(
+                    {
+                      ...compose,
+                      structureLock,
+                      lookIds: compose.lookIds.filter((id) => id !== item.id),
+                    },
+                    provider,
+                  )}
                   aria-label={`Remove ${item.filename}`}
                   className="absolute right-1 top-1 rounded-full bg-[var(--plaster)]/80 p-1"
                 >
@@ -246,28 +279,13 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
               className="w-full resize-none overflow-hidden rounded-md border border-[var(--muted)]/30 bg-transparent py-2 pl-9 pr-3 text-sm placeholder:text-[var(--muted)]"
             />
           </label>
-          <div className="flex w-full items-center gap-2 md:w-auto">
-            <label className="min-w-0 flex-1 text-sm text-[var(--muted)] md:flex-none">
-              <span className="sr-only">Model</span>
-              <select
-                value={provider}
-                onChange={(event) =>
-                  setProvider(event.target.value === "gemini" ? "gemini" : "openai")
-                }
-                className="w-full rounded-md border border-[var(--muted)]/40 bg-[var(--plaster)] px-2 py-2 text-sm md:w-auto"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="gemini">Gemini</option>
-              </select>
-            </label>
-            <button
-              type="submit"
-              disabled={!base.id || submitting}
-              className={`${primaryActionClass} shrink-0`}
-            >
-              {submitting ? "Starting…" : "Generate"}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={!base.id || submitting}
+            className={`${primaryActionClass} shrink-0`}
+          >
+            {submitting ? "Starting…" : "Generate"}
+          </button>
         </div>
         {actionData?.error ? (
           <p className="mx-auto mt-2 max-w-5xl text-sm text-[var(--clay)]">
