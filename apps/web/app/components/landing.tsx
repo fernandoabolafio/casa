@@ -21,12 +21,12 @@ export function Landing() {
       <figure className="mt-10">
         <div className="grid gap-3 sm:grid-cols-2">
           <ProofShot
-            src="/proof/room-base.jpg"
+            src="/proof/sofa-base.jpg"
             label="Base"
             alt="The room photo before a generation"
           />
           <ProofShot
-            src="/proof/room-winner.jpg"
+            src="/proof/sofa-winner.jpg"
             label="Winner"
             alt="The generated room"
           />
