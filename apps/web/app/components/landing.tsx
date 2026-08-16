@@ -36,9 +36,6 @@ export function Landing() {
         </figcaption>
       </figure>
 
-      <p className="mt-6 max-w-lg text-sm text-[var(--muted)]">
-        Steal a look — style only, will not move your windows.
-      </p>
 
       <p className="mt-10 flex flex-wrap gap-3">
         <Link
