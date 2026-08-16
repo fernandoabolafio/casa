@@ -30,15 +30,15 @@ import {
 } from "~/lib/images.server";
 import { requirePageUser } from "~/lib/require-auth";
 
-/** Gemini held room geometry in live walks. Occupant path does not pick a vendor. */
-const DEFAULT_PROVIDER: ImageProvider = "gemini";
+/** OpenAI is the default. Occupant path does not pick a vendor. */
+const DEFAULT_PROVIDER: ImageProvider = "openai";
 
 function providerFromSearch(url: URL): ImageProvider {
   const parsed = providerSchema.safeParse(url.searchParams.get("provider"));
   return parsed.success ? parsed.data : DEFAULT_PROVIDER;
 }
 
-/** Quiet hatch: `?provider=openai` on the mosaic URL. Default Gemini is omitted. */
+/** Quiet hatch: `?provider=gemini` on the mosaic URL. Default OpenAI is omitted. */
 function mosaicPath(
   state: Partial<ComposeState>,
   provider: ImageProvider,
