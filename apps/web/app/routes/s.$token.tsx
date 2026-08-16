@@ -65,15 +65,10 @@ export default function SharedResult({ loaderData }: Route.ComponentProps) {
       base={job.base}
       looks={job.inspirations}
       backHref={isOwner ? "/" : undefined}
+      promoteHref={isOwner ? promoteHref : undefined}
       secondary={
         isOwner ? (
           <p className="mt-3 flex flex-wrap gap-4 text-sm">
-            <Link
-              to={promoteHref}
-              className="text-[var(--muted)] underline"
-            >
-              Use as base
-            </Link>
             <Link
               to="/generate/room"
               className="text-[var(--muted)] underline"

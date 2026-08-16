@@ -2,7 +2,11 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
 import { Wordmark } from "~/components/wordmark";
-import { jobTitle, primaryActionClass } from "~/lib/compose";
+import {
+  jobTitle,
+  primaryActionClass,
+  secondaryActionClass,
+} from "~/lib/compose";
 import type { GalleryImage } from "~/lib/images.server";
 import { downloadImage, shareResult } from "~/lib/result-actions";
 
@@ -14,6 +18,7 @@ export function ResultInspect({
   base,
   looks,
   backHref,
+  promoteHref,
   secondary,
 }: {
   prompt: string;
@@ -23,7 +28,8 @@ export function ResultInspect({
   base: GalleryImage | null;
   looks: GalleryImage[];
   backHref?: string;
-  secondary: ReactNode;
+  promoteHref?: string;
+  secondary?: ReactNode;
 }) {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -93,12 +99,18 @@ export function ResultInspect({
 
         <RecipeStrip base={base} looks={looks} />
 
+        {promoteHref ? (
+          <Link to={promoteHref} className={`${primaryActionClass} mt-3 w-full`}>
+            Use as base
+          </Link>
+        ) : null}
+
         <div className="mt-3 flex gap-2">
           <button
             type="button"
             disabled={busy}
             onClick={() => void onDownload()}
-            className={`${primaryActionClass} flex-1`}
+            className={`${secondaryActionClass} flex-1 disabled:opacity-50`}
           >
             Download
           </button>
@@ -106,7 +118,7 @@ export function ResultInspect({
             type="button"
             disabled={busy}
             onClick={() => void onShare()}
-            className={`${primaryActionClass} flex-1`}
+            className={`${secondaryActionClass} flex-1 disabled:opacity-50`}
           >
             Share
           </button>

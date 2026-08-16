@@ -43,11 +43,9 @@ export default function ResultView({ loaderData }: Route.ComponentProps) {
       base={job.base}
       looks={job.inspirations}
       backHref="/"
+      promoteHref={promoteHref}
       secondary={
         <p className="mt-3 flex flex-wrap gap-4 text-sm">
-          <Link to={promoteHref} className="text-[var(--muted)] underline">
-            Use as base
-          </Link>
           <Link
             to="/generate/room"
             className="text-[var(--muted)] underline"
