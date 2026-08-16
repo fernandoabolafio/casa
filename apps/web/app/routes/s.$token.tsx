@@ -31,14 +31,14 @@ export async function loader({ request, context, params }: Route.LoaderArgs) {
   };
 }
 
-export const meta: Route.MetaFunction = ({ data }) => {
-  if (!data) {
+export const meta: Route.MetaFunction = ({ loaderData }) => {
+  if (!loaderData) {
     return [{ title: "Casa" }];
   }
   return [
-    { title: data.title },
-    { property: "og:title", content: data.title },
-    { property: "og:image", content: data.ogImageUrl },
+    { title: loaderData.title },
+    { property: "og:title", content: loaderData.title },
+    { property: "og:image", content: loaderData.ogImageUrl },
     { name: "twitter:card", content: "summary_large_image" },
   ];
 };
