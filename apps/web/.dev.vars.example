@@ -9,3 +9,4 @@ PUBLIC_WEB_URL=http://localhost:5173
 # Local generate (already set as wrangler secrets in production):
 # OPENAI_API_KEY=
 # GEMINI_API_KEY=
+# PEXELS_API_KEY=

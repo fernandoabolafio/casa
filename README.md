@@ -62,6 +62,7 @@ cd apps/web
 npx wrangler secret put BETTER_AUTH_SECRET
 npx wrangler secret put OPENAI_API_KEY
 npx wrangler secret put GEMINI_API_KEY
+npx wrangler secret put PEXELS_API_KEY
 ```
 
 Those image keys are already set on the live Worker. Do not put them in the repo or in GitHub secrets.
