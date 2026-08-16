@@ -3,6 +3,7 @@ import { Link, redirect } from "react-router";
 import type { Route } from "./+types/results.$jobId";
 
 import { ResultInspect } from "~/components/result-inspect";
+import { roomDownloadName } from "~/lib/brand";
 import { composePath } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
 import {
@@ -37,19 +38,19 @@ export default function ResultView({ loaderData }: Route.ComponentProps) {
     <ResultInspect
       prompt={job.prompt}
       imageUrl={image.url}
-      filename={image.filename || `casa-${job.id}.png`}
+      filename={image.filename || roomDownloadName(job.id)}
       shareUrl={shareUrl}
       base={job.base}
       looks={job.inspirations}
       backHref="/"
       secondary={
         <p className="mt-3 flex flex-wrap gap-4 text-sm">
-          <Link to={promoteHref} className="text-[var(--color-muted)] underline">
+          <Link to={promoteHref} className="text-[var(--muted)] underline">
             Use as base
           </Link>
           <Link
             to="/generate/room"
-            className="text-[var(--color-muted)] underline"
+            className="text-[var(--muted)] underline"
           >
             New generation
           </Link>

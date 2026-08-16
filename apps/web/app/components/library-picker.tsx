@@ -62,7 +62,7 @@ export function UploadButton({
         {uploading ? "Uploading…" : label}
       </button>
       {error ? (
-        <p className="mt-2 text-sm text-[var(--color-accent)]">{error}</p>
+        <p className="mt-2 text-sm text-[var(--clay)]">{error}</p>
       ) : null}
     </div>
   );
@@ -140,14 +140,14 @@ export function LibraryModal({
       <button
         type="button"
         aria-label="Close library"
-        className="absolute inset-0 bg-black/70"
+        className="absolute inset-0 bg-[var(--ink)]/60"
         onClick={onClose}
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 flex max-h-[80vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--color-muted)]/30 bg-[var(--color-page)] p-5"
+        className="relative z-10 flex max-h-[80vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--muted)]/30 bg-[var(--plaster)] p-5"
       >
         <div className="flex items-center justify-between gap-4">
           <h2 id={titleId} className="text-lg font-medium">
@@ -157,7 +157,7 @@ export function LibraryModal({
             type="button"
             onClick={onClose}
             aria-label="Close library"
-            className="rounded-full border border-[var(--color-muted)]/40 p-1.5"
+            className="rounded-full border border-[var(--muted)]/40 p-1.5"
           >
             <CloseIcon />
           </button>
@@ -178,7 +178,7 @@ export function LibraryModal({
 
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
           {shown.length === 0 ? (
-            <p className="text-sm text-[var(--color-muted)]">
+            <p className="text-sm text-[var(--muted)]">
               {pile === "upload" ? "No uploads yet." : "No generations yet."}
             </p>
           ) : (
@@ -200,8 +200,8 @@ export function LibraryModal({
                       }}
                       className={`relative block w-full overflow-hidden rounded-md border-2 ${
                         selected
-                          ? "border-[var(--color-accent)]"
-                          : "border-[var(--color-muted)]/30"
+                          ? "border-[var(--clay)]"
+                          : "border-[var(--muted)]/30"
                       }`}
                     >
                       <img
@@ -210,7 +210,7 @@ export function LibraryModal({
                         className="pointer-events-none aspect-[4/3] w-full object-cover"
                       />
                       {selected ? (
-                        <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-accent)] text-[var(--color-page)]">
+                        <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--clay)] text-[var(--plaster)]">
                           <CheckIcon />
                         </span>
                       ) : null}
@@ -249,8 +249,8 @@ function PileTab({
       onClick={onClick}
       className={`rounded-full px-3 py-1 text-sm ${
         active
-          ? "border border-[var(--color-ink)]"
-          : "border border-[var(--color-muted)]/30 text-[var(--color-muted)]"
+          ? "border border-[var(--ink)]"
+          : "border border-[var(--muted)]/30 text-[var(--muted)]"
       }`}
     >
       {label}

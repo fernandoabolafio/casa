@@ -139,7 +139,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
       <div className="flex min-h-0 flex-1 flex-col pb-[7.5rem] md:pb-[4.75rem]">
         <Link
           to={roomHref}
-          className="relative mt-3 min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--color-muted)]/30"
+          className="relative mt-3 min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--muted)]/30"
         >
           <img
             src={base.url}
@@ -150,7 +150,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
             BASE · the room
           </p>
         </Link>
-        <label className="mt-2 flex shrink-0 items-center justify-center gap-2 text-xs text-[var(--color-muted)]">
+        <label className="mt-2 flex shrink-0 items-center justify-center gap-2 text-xs text-[var(--muted)]">
           <input
             type="checkbox"
             checked={structureLock}
@@ -160,8 +160,8 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
           <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 ${
               structureLock
-                ? "border-[var(--color-accent)] text-[var(--color-accent)]"
-                : "border-[var(--color-muted)]/40"
+                ? "border-[var(--sage)] text-[var(--sage)]"
+                : "border-[var(--muted)]/40"
             }`}
           >
             <LockIcon />
@@ -170,12 +170,12 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
         </label>
 
         <section className="mt-2 shrink-0">
-          <p className="text-xs text-[var(--color-muted)]">Looks</p>
+          <p className="text-xs text-[var(--muted)]">Looks</p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {looks.map((item) => (
               <li
                 key={item.id}
-                className="relative h-16 w-20 overflow-hidden rounded-md border border-[var(--color-muted)]/30"
+                className="relative h-16 w-20 overflow-hidden rounded-md border border-[var(--muted)]/30"
               >
                 <img
                   src={item.url}
@@ -189,7 +189,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
                     lookIds: compose.lookIds.filter((id) => id !== item.id),
                   })}
                   aria-label={`Remove ${item.filename}`}
-                  className="absolute right-1 top-1 rounded-full bg-[var(--color-page)]/80 p-1"
+                  className="absolute right-1 top-1 rounded-full bg-[var(--plaster)]/80 p-1"
                 >
                   <CloseIcon />
                 </Link>
@@ -201,7 +201,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
                   type="button"
                   onClick={() => setLibraryOpen(true)}
                   aria-label="From library"
-                  className="flex h-16 w-20 items-center justify-center rounded-md border border-dashed border-[var(--color-muted)]/50 text-[var(--color-muted)]"
+                  className="flex h-16 w-20 items-center justify-center rounded-md border border-dashed border-[var(--muted)]/50 text-[var(--muted)]"
                 >
                   <PlusIcon />
                 </button>
@@ -221,7 +221,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
 
       <Form
         method="post"
-        className="fixed inset-x-0 bottom-0 border-t border-[var(--color-muted)]/20 bg-[var(--color-page)] px-6 py-3"
+        className="fixed inset-x-0 bottom-0 border-t border-[var(--muted)]/20 bg-[var(--plaster)] px-6 py-3"
       >
         <input type="hidden" name="baseId" value={base.id} />
         <input type="hidden" name="lookIds" value={compose.lookIds.join(",")} />
@@ -234,7 +234,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
         <div className="mx-auto flex max-w-5xl flex-col gap-2 md:flex-row md:items-center">
           <label className="relative w-full min-w-0 md:flex-1">
             <span className="sr-only">Optional direction</span>
-            <span className="pointer-events-none absolute left-3 top-2.5 text-[var(--color-muted)]">
+            <span className="pointer-events-none absolute left-3 top-2.5 text-[var(--muted)]">
               <SparkleIcon />
             </span>
             <textarea
@@ -243,18 +243,18 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               placeholder="Optional direction — swap the sofa, warmer wood"
-              className="w-full resize-none overflow-hidden rounded-md border border-[var(--color-muted)]/30 bg-transparent py-2 pl-9 pr-3 text-sm placeholder:text-[var(--color-muted)]"
+              className="w-full resize-none overflow-hidden rounded-md border border-[var(--muted)]/30 bg-transparent py-2 pl-9 pr-3 text-sm placeholder:text-[var(--muted)]"
             />
           </label>
           <div className="flex w-full items-center gap-2 md:w-auto">
-            <label className="min-w-0 flex-1 text-sm text-[var(--color-muted)] md:flex-none">
+            <label className="min-w-0 flex-1 text-sm text-[var(--muted)] md:flex-none">
               <span className="sr-only">Model</span>
               <select
                 value={provider}
                 onChange={(event) =>
                   setProvider(event.target.value === "gemini" ? "gemini" : "openai")
                 }
-                className="w-full rounded-md border border-[var(--color-muted)]/40 bg-[var(--color-page)] px-2 py-2 text-sm md:w-auto"
+                className="w-full rounded-md border border-[var(--muted)]/40 bg-[var(--plaster)] px-2 py-2 text-sm md:w-auto"
               >
                 <option value="openai">OpenAI</option>
                 <option value="gemini">Gemini</option>
@@ -270,7 +270,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
           </div>
         </div>
         {actionData?.error ? (
-          <p className="mx-auto mt-2 max-w-5xl text-sm text-[var(--color-accent)]">
+          <p className="mx-auto mt-2 max-w-5xl text-sm text-[var(--clay)]">
             {actionData.error}
           </p>
         ) : null}

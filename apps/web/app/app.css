@@ -1,19 +1,26 @@
 @import "tailwindcss" source(".");
 
+/* Designer tokens, 2026-08-16. Photo-first: the room is the loud color. */
+:root {
+  --plaster: #F3EEE6;
+  --ink: #2C2824;
+  --muted: #6B6560;
+  --clay: #C45C38;
+  --lamp: #D4A574;
+  --sage: #6B7F6A;
+}
+
 @theme {
-  --font-sans: "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --color-ink: #f6edda;
-  --color-muted: #b6a88b;
-  --color-accent: #d9a441;
-  --color-page: #13110e;
+  --font-sans: "Source Sans 3", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", Georgia, serif;
 }
 
 html,
 body {
   min-height: 100%;
   margin: 0;
-  background: var(--color-page);
-  color: var(--color-ink);
+  background: var(--plaster);
+  color: var(--ink);
   font-family: var(--font-sans);
-  color-scheme: dark;
+  color-scheme: light;
 }
