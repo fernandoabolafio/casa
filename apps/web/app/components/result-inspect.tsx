@@ -70,7 +70,7 @@ export function ResultInspect({
   }
 
   return (
-    <main className="mx-auto flex h-dvh max-w-5xl flex-col overflow-hidden px-6 py-4">
+    <main className="mx-auto flex min-h-dvh max-w-5xl flex-col px-6 py-4">
       <header className="flex shrink-0 items-center justify-between gap-4">
         {backHref ? (
           <Link to={backHref} className="text-sm text-[var(--muted)]">
@@ -82,12 +82,19 @@ export function ResultInspect({
         {backHref ? <Wordmark /> : <span />}
       </header>
 
-      <div className="mt-3 flex min-h-0 flex-1 items-center justify-center">
-        <img
-          src={imageUrl}
-          alt={title}
-          className="max-h-full max-w-full object-contain"
-        />
+      <div className="mt-3">
+        {base ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Shot
+              src={base.url}
+              label="Base"
+              alt="The room photo this job started from"
+            />
+            <Shot src={imageUrl} label="Winner" alt={title} />
+          </div>
+        ) : (
+          <Shot src={imageUrl} label="Winner" alt={title} />
+        )}
       </div>
 
       <section className="mt-3 shrink-0 pb-2">
@@ -97,7 +104,7 @@ export function ResultInspect({
           </p>
         ) : null}
 
-        <RecipeStrip base={base} looks={looks} />
+        <LooksStrip looks={looks} />
 
         {promoteHref ? (
           <Link to={promoteHref} className={`${primaryActionClass} mt-3 w-full`}>
@@ -141,31 +148,36 @@ export function ResultInspect({
   );
 }
 
-function RecipeStrip({
-  base,
-  looks,
+function Shot({
+  src,
+  label,
+  alt,
 }: {
-  base: GalleryImage | null;
-  looks: GalleryImage[];
+  src: string;
+  label: string;
+  alt: string;
 }) {
-  if (!base && looks.length === 0) {
+  return (
+    <div>
+      <img
+        src={src}
+        alt={alt}
+        className="aspect-[4/3] w-full rounded-lg object-cover"
+      />
+      <p className="mt-2 text-center text-[10px] uppercase tracking-wide text-[var(--muted)]">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function LooksStrip({ looks }: { looks: GalleryImage[] }) {
+  if (looks.length === 0) {
     return null;
   }
 
   return (
     <ul className="mt-3 flex flex-wrap gap-2">
-      {base ? (
-        <li>
-          <img
-            src={base.url}
-            alt="Base"
-            className="h-14 w-16 rounded object-cover"
-          />
-          <p className="mt-1 text-center text-[10px] uppercase tracking-wide text-[var(--muted)]">
-            Base
-          </p>
-        </li>
-      ) : null}
       {looks.map((item, index) => (
         <li key={item.id}>
           <img
