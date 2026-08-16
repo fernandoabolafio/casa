@@ -40,10 +40,14 @@ export async function listUserImages(
   }));
 }
 
-export async function getOwnedImage(env: Env, userId: string, imageId: string) {
+export async function getImage(env: Env, imageId: string) {
   const db = createDb(env);
   const rows = await db.select().from(image).where(eq(image.id, imageId));
-  const row = rows[0];
+  return rows[0] ?? null;
+}
+
+export async function getOwnedImage(env: Env, userId: string, imageId: string) {
+  const row = await getImage(env, imageId);
   if (!row || row.userId !== userId) {
     return null;
   }

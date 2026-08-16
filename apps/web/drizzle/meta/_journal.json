@@ -22,6 +22,13 @@
       "when": 1755252002000,
       "tag": "0002_generations",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1755252003000,
+      "tag": "0003_share_tokens",
+      "breakpoints": true
     }
   ]
 }

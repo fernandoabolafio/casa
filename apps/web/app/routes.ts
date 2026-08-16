@@ -9,6 +9,8 @@ export default [
     route("mosaic", "routes/generate.mosaic.tsx"),
   ]),
   route("results/:jobId", "routes/results.$jobId.tsx"),
+  route("s/:token", "routes/s.$token.tsx"),
+  route("s/:token/i/:imageId", "routes/s.$token.i.$imageId.ts"),
   route("sign-in", "routes/sign-in.tsx"),
   route("sign-up", "routes/sign-up.tsx"),
   route("api/auth/*", "routes/api.auth.$.ts"),

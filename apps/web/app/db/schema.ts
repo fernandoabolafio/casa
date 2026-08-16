@@ -1,4 +1,10 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 // Four Better Auth tables copied from joga-app
 // `backend/src/db/schema.ts` / `backend/drizzle/0000_wild_warhawk.sql`.
@@ -107,6 +113,7 @@ export const generation = sqliteTable(
       .notNull()
       .default(true),
     resultImageId: text("result_image_id").references(() => image.id),
+    shareToken: text("share_token"),
     error: text("error"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
@@ -114,5 +121,6 @@ export const generation = sqliteTable(
   (table) => [
     index("generation_user_id_idx").on(table.userId),
     index("generation_user_created_idx").on(table.userId, table.createdAt),
+    uniqueIndex("generation_share_token_idx").on(table.shareToken),
   ],
 );

@@ -27,19 +27,30 @@ export async function shareResult(input: {
   filename: string;
   title: string;
 }): Promise<"shared" | "copied" | "downloaded"> {
-  const blob = await fetchImageBlob(input.imageUrl);
-  const type = blob.type || "image/png";
-  const file = new File([blob], input.filename, { type });
-
   if (typeof navigator.share === "function") {
     try {
-      if (navigator.canShare?.({ files: [file] })) {
+      let file: File | undefined;
+      try {
+        const blob = await fetchImageBlob(input.imageUrl);
+        file = new File([blob], input.filename, {
+          type: blob.type || "image/png",
+        });
+      } catch {
+        file = undefined;
+      }
+
+      if (
+        file &&
+        navigator.canShare?.({ files: [file], url: input.pageUrl })
+      ) {
         await navigator.share({
           files: [file],
           title: input.title,
+          url: input.pageUrl,
         });
         return "shared";
       }
+
       await navigator.share({
         title: input.title,
         url: input.pageUrl,
