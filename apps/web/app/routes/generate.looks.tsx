@@ -89,7 +89,7 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
         Steal a look
       </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Steal the sofa, the paint, the mood.
+        Color and fabric from a photo you like.
       </p>
 
       <div className="mt-6 flex items-center gap-3">
