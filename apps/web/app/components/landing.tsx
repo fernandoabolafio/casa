@@ -37,7 +37,7 @@ export function Landing() {
       </figure>
 
       <p className="mt-6 max-w-lg text-sm text-[var(--muted)]">
-        Steal a look — style only, will not move your windows.
+        Same windows. New sofa.
       </p>
 
 
