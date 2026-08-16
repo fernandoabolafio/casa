@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
 import type { Route } from "./+types/generate.room";
@@ -21,6 +21,33 @@ import { listUserImages, type GalleryImage } from "~/lib/images.server";
 import { formatAgo } from "~/lib/relative-time";
 import { requirePageUser } from "~/lib/require-auth";
 
+const phoneishQuery = "(hover: none) and (pointer: coarse)";
+
+function usePhoneish(): boolean | null {
+  const [phoneish, setPhoneish] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const media = window.matchMedia(phoneishQuery);
+    const sync = () => setPhoneish(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  return phoneish;
+}
+
+/** Clay ranking for the three room sources. Library is never clay. */
+function roomSourceEmphasis(
+  hasUploads: boolean,
+  phoneish: boolean | null,
+): { takePhoto: boolean; choosePhotos: boolean } {
+  if (!hasUploads && phoneish === false) {
+    return { takePhoto: false, choosePhotos: true };
+  }
+  return { takePhoto: true, choosePhotos: false };
+}
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = await requirePageUser(request, context);
   const env = getEnv(context);
@@ -42,6 +69,9 @@ export default function GenerateRoom({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
   const { images, compose, lastDone, running, now } = loaderData;
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const hasUploads = images.some((item) => item.kind === "upload");
+  const phoneish = usePhoneish();
+  const emphasis = roomSourceEmphasis(hasUploads, phoneish);
 
   function pickBase(image: GalleryImage) {
     navigate(
@@ -74,12 +104,16 @@ export default function GenerateRoom({ loaderData }: Route.ComponentProps) {
         />
       ) : null}
 
-      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+      <div className="mt-8 grid gap-3 sm:grid-cols-3">
         <UploadButton
-          label="Upload a photo"
-          emphasize={
-            images.filter((item) => item.kind === "upload").length === 0
-          }
+          label="Take a photo"
+          capture="environment"
+          emphasize={emphasis.takePhoto}
+          onUploaded={pickBase}
+        />
+        <UploadButton
+          label="Choose from photos"
+          emphasize={emphasis.choosePhotos}
           onUploaded={pickBase}
         />
         <FromLibraryButton onClick={() => setLibraryOpen(true)} />
