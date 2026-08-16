@@ -4,6 +4,8 @@ import { Wordmark } from "~/components/wordmark";
 import { headingClass } from "~/lib/brand";
 import { primaryActionClass, secondaryActionClass } from "~/lib/compose";
 
+const startHref = "/sign-up?next=/generate/room";
+
 export function Landing() {
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
@@ -31,8 +33,10 @@ export function Landing() {
             alt="The generated room"
           />
         </div>
-        <figcaption className="mt-4 text-sm text-[var(--muted)]">
-          Use as base → next room
+        <figcaption className="mt-4">
+          <Link to={startHref} className={primaryActionClass}>
+            Use as base → next room
+          </Link>
         </figcaption>
       </figure>
 
@@ -42,10 +46,7 @@ export function Landing() {
 
 
       <p className="mt-10 flex flex-wrap gap-3">
-        <Link
-          to="/sign-up?next=/generate/room"
-          className={primaryActionClass}
-        >
+        <Link to={startHref} className={primaryActionClass}>
           Create an account
         </Link>
         <Link to="/sign-in?next=/" className={secondaryActionClass}>
