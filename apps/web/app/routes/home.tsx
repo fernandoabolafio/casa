@@ -3,6 +3,7 @@ import { Link, redirect, useFetcher } from "react-router";
 
 import type { Route } from "./+types/home";
 
+import { Landing } from "~/components/landing";
 import { signOut } from "~/lib/auth";
 import { composePath, jobTitle, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
@@ -39,35 +40,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     return <Landing />;
   }
   return <HomeJobs jobs={loaderData.jobs} now={loaderData.now} />;
-}
-
-function Landing() {
-  return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-16">
-      <p className="text-sm tracking-wide text-[var(--color-accent)]">Casa</p>
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight">
-        Home design, from a photo.
-      </h1>
-      <p className="mt-4 max-w-lg text-[var(--color-muted)]">
-        Upload a room photo, generate, pick a winner. That winner is the next
-        room.
-      </p>
-      <p className="mt-8 flex flex-wrap gap-3">
-        <Link
-          to="/sign-in?next=/"
-          className="inline-block rounded-md bg-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-page)]"
-        >
-          Sign in
-        </Link>
-        <Link
-          to="/sign-up?next=/"
-          className="inline-block rounded-md border border-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-accent)]"
-        >
-          Create an account
-        </Link>
-      </p>
-    </main>
-  );
 }
 
 type JobsPayload = {
