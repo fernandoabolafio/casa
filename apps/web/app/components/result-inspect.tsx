@@ -74,7 +74,7 @@ export function ResultInspect({
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-5xl flex-col px-6 py-4">
+    <main className="mx-auto flex min-h-dvh max-w-5xl flex-col px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <header className="flex shrink-0 items-center justify-between gap-4">
         {backHref ? (
           <Link to={backHref} className="text-sm text-[var(--muted)]">
@@ -101,7 +101,7 @@ export function ResultInspect({
         )}
       </div>
 
-      <section className="mt-3 shrink-0 pb-2">
+      <section className="mt-3 shrink-0">
         {prompt.trim() ? (
           <p className="truncate text-sm text-[var(--muted)]">
             {prompt.trim()}
