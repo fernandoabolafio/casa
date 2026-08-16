@@ -53,7 +53,7 @@ export default function SharedResult({ loaderData }: Route.ComponentProps) {
     return null;
   }
 
-  const promoteHref = composePath("looks", { baseId: image.id });
+  const ownerPromoteHref = composePath("looks", { baseId: image.id });
   const makeOwnHref = signedIn ? "/generate/room" : "/sign-up?next=/generate/room";
 
   return (
@@ -65,7 +65,9 @@ export default function SharedResult({ loaderData }: Route.ComponentProps) {
       base={job.base}
       looks={job.inspirations}
       backHref={isOwner ? "/" : undefined}
-      promoteHref={isOwner ? promoteHref : undefined}
+      promoteHref={isOwner ? ownerPromoteHref : makeOwnHref}
+      promoteLabel={isOwner ? "Use as base" : "Make your own"}
+      showShare={isOwner}
       secondary={
         isOwner ? (
           <p className="mt-3 flex flex-wrap gap-4 text-sm">
@@ -76,13 +78,7 @@ export default function SharedResult({ loaderData }: Route.ComponentProps) {
               New generation
             </Link>
           </p>
-        ) : (
-          <p className="mt-3 text-sm">
-            <Link to={makeOwnHref} className="text-[var(--muted)] underline">
-              Make your own
-            </Link>
-          </p>
-        )
+        ) : undefined
       }
     />
   );

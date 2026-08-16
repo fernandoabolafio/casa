@@ -19,6 +19,8 @@ export function ResultInspect({
   looks,
   backHref,
   promoteHref,
+  promoteLabel = "Use as base",
+  showShare = true,
   secondary,
 }: {
   prompt: string;
@@ -29,6 +31,8 @@ export function ResultInspect({
   looks: GalleryImage[];
   backHref?: string;
   promoteHref?: string;
+  promoteLabel?: string;
+  showShare?: boolean;
   secondary?: ReactNode;
 }) {
   const [status, setStatus] = useState<string | null>(null);
@@ -108,7 +112,7 @@ export function ResultInspect({
 
         {promoteHref ? (
           <Link to={promoteHref} className={`${primaryActionClass} mt-3 w-full`}>
-            Use as base
+            {promoteLabel}
           </Link>
         ) : null}
 
@@ -121,14 +125,16 @@ export function ResultInspect({
           >
             Download
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void onShare()}
-            className={`${secondaryActionClass} flex-1 disabled:opacity-50`}
-          >
-            Share
-          </button>
+          {showShare ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onShare()}
+              className={`${secondaryActionClass} flex-1 disabled:opacity-50`}
+            >
+              Share
+            </button>
+          ) : null}
         </div>
 
         {secondary}
