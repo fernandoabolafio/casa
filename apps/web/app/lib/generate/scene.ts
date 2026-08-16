@@ -119,13 +119,13 @@ const REFERENCE_INSTRUCTIONS =
   "DESIGN REFERENCES — these are prior renders (or photographs) of the SAME room that the base belongs to. Treat them as the LOCKED design state of the room. Identify every concrete design decision they show — wall paint colors and finishes, ceiling treatment, flooring material and direction, the specific sofa / chairs / tables / beds / lamps / rugs / curtains / artwork / plants / hardware, the specific materials and textures, the lighting temperature and intensity — and reproduce the SAME items and finishes in the new view. Match colors as closely as possible (same paint family, same wood tone, same fabric). Do NOT redesign or substitute these elements. Annotations on a reference clarify which elements matter most or are non-negotiable.";
 
 const INSPIRATION_INSTRUCTIONS =
-  "STYLE INSPIRATIONS — borrow ONLY their aesthetic, color palette, materials, finishes, lighting mood, furniture silhouettes, and decor language. Do NOT copy their geometry, layout, perspective, or specific room contents. Annotations on an inspiration image highlight the qualities the user wants borrowed.";
+  "STYLE INSPIRATIONS — borrow ONLY color, fabric, material, and finish. Apply those qualities to the furniture and surfaces already in the base. Do NOT copy furniture as objects, furniture silhouettes, decor language, lighting mood, room geometry, layout, camera, or specific pieces from an inspiration. A sofa (or any piece) in a look photo is a tone source — it does not land in the room. Annotations on an inspiration image highlight which color, fabric, material, or finish to borrow.";
 
 const STYLE_ONLY_INSTRUCTIONS =
   "No base room was provided. Synthesize a new coherent interior scene that captures the combined aesthetic of the inspirations.";
 
 const FINAL_INSTRUCTIONS =
-  "Produce a single new photorealistic interior scene that satisfies the directives above. Conflict resolution: BASE wins on geometry/perspective; DESIGN REFERENCES win on color, material, and specific furnishings; INSPIRATIONS only fill gaps the base and references do not resolve; the USER DIRECTION overrides specific items it names. Do not render the annotation marks themselves in the output.";
+  "Produce a single new photorealistic interior scene that satisfies the directives above. Conflict resolution: BASE wins on geometry/perspective; DESIGN REFERENCES win on color, material, and specific furnishings; INSPIRATIONS only fill color, fabric, material, and finish gaps the base and references do not resolve — they never supply furniture, silhouettes, decor language, lighting mood, layout, or camera; the USER DIRECTION overrides specific items it names. Do not render the annotation marks themselves in the output.";
 
 function formatHintsBlock(label: string, hints: string[]): string | null {
   if (hints.length === 0) return null;
