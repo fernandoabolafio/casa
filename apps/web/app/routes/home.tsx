@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, redirect, useFetcher } from "react-router";
 
 import type { Route } from "./+types/home";
@@ -14,7 +14,7 @@ import {
   type GenerationJob,
 } from "~/lib/generations.server";
 import { getSession } from "~/lib/require-auth";
-import { formatAgo } from "~/lib/relative-time";
+import { formatAgo, formatElapsed } from "~/lib/relative-time";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = await getSession(request, context);
@@ -125,13 +125,11 @@ function HomeJobs({
                   </div>
                 )}
                 <div>
-                  <p className="text-lg">Generating...</p>
+                  <p className="text-lg">Generating one image</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
                     {job.prompt.trim() || "No extra direction"}
                   </p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    Started {formatAgo(job.createdAt, now)} · you can leave
-                  </p>
+                  <RunningWait startedAt={job.createdAt} />
                 </div>
               </li>
             ))}
@@ -155,6 +153,22 @@ function HomeJobs({
         </section>
       ) : null}
     </main>
+  );
+}
+
+function RunningWait({ startedAt }: { startedAt: number }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <p className="mt-1 text-xs text-[var(--muted)]">
+      {formatElapsed(startedAt, now)} · about a minute. You can leave and come
+      back.
+    </p>
   );
 }
 

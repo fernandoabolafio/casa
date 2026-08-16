@@ -60,7 +60,7 @@ export default function GenerateRoom({ loaderData }: Route.ComponentProps) {
 
       {running ? (
         <p className="mt-6 text-sm text-[var(--lamp)]">
-          Last job is still generating. Pick another room.
+          Last job is still generating — about a minute. Pick another room.
         </p>
       ) : null}
 

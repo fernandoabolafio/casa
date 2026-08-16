@@ -136,7 +136,7 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
 
   return (
     <ComposeChrome flush>
-      <div className="flex min-h-0 flex-1 flex-col pb-[7.5rem] md:pb-[4.75rem]">
+      <div className="flex min-h-0 flex-1 flex-col pb-[9rem] md:pb-[6.25rem]">
         <Link
           to={roomHref}
           className="relative mt-3 min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--muted)]/30"
@@ -273,7 +273,11 @@ export default function GenerateMosaic({ loaderData }: Route.ComponentProps) {
           <p className="mx-auto mt-2 max-w-5xl text-sm text-[var(--clay)]">
             {actionData.error}
           </p>
-        ) : null}
+        ) : (
+          <p className="mx-auto mt-2 max-w-5xl text-xs text-[var(--muted)]">
+            One image. About a minute. You can leave and come back.
+          </p>
+        )}
       </Form>
     </ComposeChrome>
   );

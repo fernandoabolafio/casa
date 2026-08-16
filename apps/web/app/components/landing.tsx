@@ -12,8 +12,7 @@ export function Landing() {
         Home design, from a photo.
       </h1>
       <p className="mt-4 max-w-lg text-[var(--muted)]">
-        Upload a room photo, generate, pick a winner. That winner is the next
-        room.
+        Take a photo of the room you're sitting in. Each new picture starts from the last one you liked.
       </p>
       <p className="mt-4 max-w-lg text-lg">
         See your room with the new sofa. Then keep going.
@@ -22,12 +21,12 @@ export function Landing() {
       <figure className="mt-10">
         <div className="grid gap-3 sm:grid-cols-2">
           <ProofShot
-            src="/proof/base.jpg"
+            src="/proof/sofa-base.jpg"
             label="Base"
             alt="The room photo before a generation"
           />
           <ProofShot
-            src="/proof/winner.jpg"
+            src="/proof/sofa-winner.jpg"
             label="Winner"
             alt="The generated room"
           />
@@ -38,8 +37,9 @@ export function Landing() {
       </figure>
 
       <p className="mt-6 max-w-lg text-sm text-[var(--muted)]">
-        Steal a look — style only, will not move your windows.
+        Same windows. New sofa.
       </p>
+
 
       <p className="mt-10 flex flex-wrap gap-3">
         <Link
