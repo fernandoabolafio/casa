@@ -8,13 +8,20 @@
     "enabled": true
   },
   "upload_source_maps": true,
-  // Vars (not secrets). Auth URLs are the live Worker.
+  // Adding routes infers workers_dev=false unless this stays true.
+  // Keep casa-web.hi-c3a.workers.dev for existing outreach links.
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "seeyourroom.app", "custom_domain": true },
+    { "pattern": "www.seeyourroom.app", "custom_domain": true }
+  ],
+  // Vars (not secrets). Auth URLs are the custom domain.
   // Secrets: wrangler secret put BETTER_AUTH_SECRET
   //           wrangler secret put OPENAI_API_KEY
   //           wrangler secret put GEMINI_API_KEY
   "vars": {
-    "BETTER_AUTH_URL": "https://casa-web.hi-c3a.workers.dev",
-    "PUBLIC_WEB_URL": "https://casa-web.hi-c3a.workers.dev"
+    "BETTER_AUTH_URL": "https://seeyourroom.app",
+    "PUBLIC_WEB_URL": "https://seeyourroom.app"
   },
   "d1_databases": [
     {
