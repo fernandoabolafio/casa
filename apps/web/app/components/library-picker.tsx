@@ -1,19 +1,29 @@
 import { useEffect, useId, useRef, useState } from "react";
 
-import { CheckIcon, CloseIcon, GridIcon, UploadIcon } from "~/components/icons";
+import {
+  CameraIcon,
+  CheckIcon,
+  CloseIcon,
+  GridIcon,
+  UploadIcon,
+} from "~/components/icons";
 import { primaryActionClass, secondaryActionClass } from "~/lib/compose";
 import type { GalleryImage } from "~/lib/images.server";
 import { uploadImage } from "~/lib/upload-image";
 
 type Pile = "upload" | "generation";
 
+const libraryAccept = "image/jpeg,image/png,image/webp,image/gif";
+
 export function UploadButton({
   label,
   emphasize = false,
+  capture,
   onUploaded,
 }: {
   label: string;
   emphasize?: boolean;
+  capture?: "environment";
   onUploaded: (image: GalleryImage) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +54,8 @@ export function UploadButton({
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept={capture ? "image/*" : libraryAccept}
+        capture={capture}
         className="sr-only"
         onChange={(event) => {
           void onFile(event.target.files?.[0]);
@@ -58,7 +69,7 @@ export function UploadButton({
           emphasize ? primaryActionClass : secondaryActionClass
         }`}
       >
-        <UploadIcon />
+        {capture ? <CameraIcon /> : <UploadIcon />}
         {uploading ? "Uploading…" : label}
       </button>
       {error ? (

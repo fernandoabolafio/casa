@@ -15,6 +15,22 @@ export function UploadIcon() {
   );
 }
 
+export function CameraIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+    >
+      <path d="M4 8h3l1.5-2h7L17 8h3v11H4V8z" />
+      <circle cx="12" cy="13" r="3.25" />
+    </svg>
+  );
+}
+
 export function GridIcon() {
   return (
     <svg
