@@ -82,26 +82,18 @@ function HomeJobs({
   }, [hasRunning]);
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-6 py-8">
+    <main className="mx-auto min-h-screen max-w-5xl px-6 py-8 pb-28">
       <header className="flex items-center justify-between gap-4">
         <Wordmark />
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            className="text-xs text-[var(--muted)] underline"
-            onClick={() => {
-              void signOut().then(() => window.location.assign("/"));
-            }}
-          >
-            Sign out
-          </button>
-          <Link
-            to="/generate/room"
-            className="rounded-md border border-[var(--clay)] px-3 py-1.5 text-sm text-[var(--clay)]"
-          >
-            New generation
-          </Link>
-        </div>
+        <button
+          type="button"
+          className="text-xs text-[var(--muted)] underline"
+          onClick={() => {
+            void signOut().then(() => window.location.assign("/"));
+          }}
+        >
+          Sign out
+        </button>
       </header>
 
       {running.length > 0 ? (
@@ -152,6 +144,14 @@ function HomeJobs({
           </ul>
         </section>
       ) : null}
+
+      <div className="fixed inset-x-0 bottom-0 border-t border-[var(--muted)]/20 bg-[var(--plaster)] px-6 py-3">
+        <div className="mx-auto max-w-5xl">
+          <Link to="/generate/room" className={`${primaryActionClass} w-full`}>
+            New generation
+          </Link>
+        </div>
+      </div>
     </main>
   );
 }
