@@ -12,7 +12,7 @@ export function Landing() {
         Home design, from a photo.
       </h1>
       <p className="mt-4 max-w-lg text-[var(--muted)]">
-        Upload a room photo, generate a winner. That winner is the next room.
+        Take a photo of the room you're sitting in. Each new picture starts from the last one you liked.
       </p>
       <p className="mt-4 max-w-lg text-lg">
         See your room with the new sofa. Then keep going.
