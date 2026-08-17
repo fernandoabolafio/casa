@@ -265,10 +265,7 @@ export function PexelsLookStrip({
           <p className="mt-2 text-sm text-[var(--clay)]">{error}</p>
         ) : null}
 
-        <p className="mt-2 text-xs text-[var(--muted)] sm:hidden">
-          Tone only. Not the sofa.
-        </p>
-        <p className="mt-2 hidden text-xs text-[var(--muted)] sm:block">
+        <p className="mt-2 text-xs text-[var(--muted)]">
           Color and fabric. The room stays yours.
         </p>
         <p className="mt-1 text-[10px] text-[var(--muted)]/80">
