@@ -16,12 +16,227 @@ export type PexelsSearchPayload = {
 
 export const PEXELS_EMPTY_COPY = "Nothing useful. Try a color or a fabric.";
 
-const MATERIAL =
-  /\b(velvet|linen|oak|walnut|wool|boucle|brass|plaster|silk|cotton|leather|cane|rattan|marble|jute|mohair|tweed|ceramic|terracotta|limewash|wood|wooden|fabric|upholstery|suede|corduroy|shearling|travertine|concrete|teak|ash|pine|brushed|matte|weave|grain|cashmere|chenille|wicker|terrazzo|limestone|alabaster|nubuck|felt|hide|linen)\b/i;
+const MATERIALS = new Set([
+  "alabaster",
+  "ash",
+  "bamboo",
+  "birch",
+  "boucle",
+  "brass",
+  "brushed",
+  "cane",
+  "canvas",
+  "cashmere",
+  "cedar",
+  "ceramic",
+  "chenille",
+  "concrete",
+  "corduroy",
+  "cotton",
+  "fabric",
+  "felt",
+  "flannel",
+  "grain",
+  "hemp",
+  "hide",
+  "honed",
+  "jute",
+  "lacquer",
+  "leather",
+  "limewash",
+  "limewashed",
+  "limestone",
+  "linen",
+  "mahogany",
+  "maple",
+  "marble",
+  "matte",
+  "mohair",
+  "nubuck",
+  "oak",
+  "oiled",
+  "pine",
+  "plaster",
+  "rattan",
+  "ribbed",
+  "rosewood",
+  "satin",
+  "seersucker",
+  "shearling",
+  "silk",
+  "sisal",
+  "slub",
+  "suede",
+  "teak",
+  "terracotta",
+  "terrazzo",
+  "travertine",
+  "tweed",
+  "twill",
+  "upholstery",
+  "velvet",
+  "walnut",
+  "weave",
+  "wicker",
+  "wood",
+  "wooden",
+  "wool",
+]);
 
-const FURNITURE_OR_ROOM =
-  /\b(sofas?|couches?|chairs?|armchairs?|loveseats?|sectionals?|ottomans?|living room|bedroom|kitchen|dining room|rooms?|interior|redesign|makeover)\b/gi;
+const COLORS = new Set([
+  "amber",
+  "aqua",
+  "beige",
+  "berry",
+  "black",
+  "blue",
+  "blush",
+  "bone",
+  "brick",
+  "bronze",
+  "brown",
+  "burgundy",
+  "butter",
+  "camel",
+  "caramel",
+  "charcoal",
+  "chartreuse",
+  "cherry",
+  "chocolate",
+  "cinnamon",
+  "claret",
+  "clay",
+  "cobalt",
+  "cognac",
+  "copper",
+  "coral",
+  "cream",
+  "denim",
+  "ecru",
+  "emerald",
+  "espresso",
+  "fern",
+  "forest",
+  "gold",
+  "gray",
+  "green",
+  "greige",
+  "grey",
+  "honey",
+  "indigo",
+  "ivory",
+  "jade",
+  "khaki",
+  "lavender",
+  "lemon",
+  "lilac",
+  "magenta",
+  "maroon",
+  "mauve",
+  "mint",
+  "moss",
+  "mustard",
+  "navy",
+  "oatmeal",
+  "off-white",
+  "offwhite",
+  "ochre",
+  "ocher",
+  "olive",
+  "orange",
+  "paprika",
+  "parchment",
+  "peach",
+  "periwinkle",
+  "pink",
+  "plum",
+  "powder",
+  "purple",
+  "putty",
+  "red",
+  "rose",
+  "rust",
+  "saffron",
+  "sage",
+  "sand",
+  "seafoam",
+  "sienna",
+  "silver",
+  "sky",
+  "slate",
+  "stone",
+  "tan",
+  "taupe",
+  "teal",
+  "turquoise",
+  "umber",
+  "violet",
+  "white",
+  "wine",
+  "yellow",
+]);
 
+const MODIFIERS = new Set([
+  "aged",
+  "bright",
+  "burnt",
+  "cool",
+  "dark",
+  "deep",
+  "dusty",
+  "light",
+  "muted",
+  "natural",
+  "pale",
+  "raw",
+  "rich",
+  "soft",
+  "warm",
+  "weathered",
+]);
+
+const FURNITURE = new Set([
+  "armchair",
+  "armchairs",
+  "bench",
+  "chair",
+  "chairs",
+  "couch",
+  "couches",
+  "curtain",
+  "curtains",
+  "cushion",
+  "drape",
+  "drapes",
+  "loveseat",
+  "ottoman",
+  "pillow",
+  "rug",
+  "sectional",
+  "sofa",
+  "sofas",
+  "stool",
+]);
+
+const BLOCKED = new Set(["redesign", "makeover"]);
+
+function foldToken(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "");
+}
+
+function tokensOf(raw: string): string[] {
+  return raw
+    .trim()
+    .split(/[^a-zA-Z0-9-]+/)
+    .map(foldToken)
+    .filter((token) => token.length > 0);
+}
+
+/** Color, fabric, material, or a short material-led phrase. Else null. */
 export function normalizeLookQuery(raw: string): string | null {
   const cleaned = raw
     .trim()
@@ -30,27 +245,28 @@ export function normalizeLookQuery(raw: string): string | null {
   if (cleaned.length < 2 || cleaned.length > 80) {
     return null;
   }
-  if (!/[a-zA-Z]/.test(cleaned)) {
+
+  const tokens = tokensOf(cleaned);
+  if (tokens.length === 0 || tokens.some((token) => BLOCKED.has(token))) {
     return null;
   }
 
-  const lower = cleaned.toLowerCase();
-  if (/\b(redesign|makeover|interior design)\b/.test(lower)) {
+  const hasMaterial = tokens.some((token) => MATERIALS.has(token));
+  const hasColor = tokens.some((token) => COLORS.has(token));
+  if (!hasMaterial && !hasColor) {
     return null;
   }
 
-  if (MATERIAL.test(cleaned)) {
-    return cleaned;
+  const kept = tokens.filter((token) => {
+    if (MATERIALS.has(token) || COLORS.has(token) || MODIFIERS.has(token)) {
+      return true;
+    }
+    return hasMaterial && FURNITURE.has(token);
+  });
+  if (kept.length === 0) {
+    return null;
   }
-
-  const withoutFurniture = cleaned
-    .replace(FURNITURE_OR_ROOM, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (withoutFurniture.length >= 3) {
-    return `${withoutFurniture} fabric`;
-  }
-  return null;
+  return kept.slice(0, 6).join(" ");
 }
 
 type SearchResponse = PexelsSearchPayload & { error?: string };

@@ -13,7 +13,8 @@ import {
 const PEXELS_SEARCH = "https://api.pexels.com/v1/search";
 const PEXELS_PHOTO = "https://api.pexels.com/v1/photos";
 const SEARCH_COUNT = 6;
-const VISION_MS = 4500;
+const VISION_MS = 12000;
+const VISION_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"] as const;
 
 const pexelsPhotoSchema = z.object({
   id: z.number().int().positive(),
@@ -30,13 +31,11 @@ const pexelsSearchSchema = z.object({
   photos: z.array(pexelsPhotoSchema),
 });
 
-const VISION_PROMPT = `Look at this room photo. Reply with ONLY a short Pexels search query, 3 to 6 words, for color, fabric, or material tone.
+const VISION_PROMPT = `Look at this room photo. Reply with ONLY a short search query (2 to 6 words) for color, fabric, or material tone.
 
-Bias toward material words: velvet fabric, warm oak, linen, walnut, boucle, wool, brass, plaster. "warm wood velvet armchair" is fine if it is material-led.
+The query MUST include at least one color or fabric/material word. Good: velvet fabric, warm oak, green, rust, linen, warm wood velvet armchair. Bad: living room sofa, modern living room, redesign this room, cat, cozy interior.
 
-Do not name a room type as the query. Do not say living room sofa, modern living room, or redesign this room. A sofa in the photo is a tone source, not something to search for as furniture.
-
-No quotes. No explanation.`;
+A sofa in the photo is a tone source, not furniture to copy. No quotes. No explanation.`;
 
 function pexelsKey(env: Env): string | null {
   const key = env.PEXELS_API_KEY?.trim();
@@ -182,6 +181,23 @@ export async function importPexelsPhoto(input: {
   });
 }
 
+function textFromGemini(response: {
+  text?: string;
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+  }>;
+}): string {
+  const fromGetter = response.text?.trim();
+  if (fromGetter) {
+    return fromGetter;
+  }
+  return (response.candidates?.[0]?.content?.parts ?? [])
+    .filter((part) => !part.thought && Boolean(part.text))
+    .map((part) => part.text ?? "")
+    .join(" ")
+    .trim();
+}
+
 async function suggestFromVision(
   env: Env,
   userId: string,
@@ -199,34 +215,52 @@ async function suggestFromVision(
 
   const ai = new GoogleGenAI({ apiKey });
   const data = Buffer.from(await file.arrayBuffer()).toString("base64");
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: VISION_PROMPT },
-          {
-            inlineData: {
-              mimeType: file.type || "image/jpeg",
-              data,
-            },
+  const contents = [
+    {
+      role: "user" as const,
+      parts: [
+        { text: VISION_PROMPT },
+        {
+          inlineData: {
+            mimeType: file.type || "image/jpeg",
+            data,
           },
-        ],
-      },
-    ],
-    config: {
-      maxOutputTokens: 32,
-      temperature: 0.3,
+        },
+      ],
     },
-  });
+  ];
 
-  const text = (response.candidates?.[0]?.content?.parts ?? [])
-    .map((part) => part.text)
-    .filter((part): part is string => Boolean(part))
-    .join(" ")
-    .trim();
-  return normalizeLookQuery(text);
+  let lastError: unknown;
+  for (const model of VISION_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          maxOutputTokens: 128,
+          temperature: 0.2,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      });
+      const raw = textFromGemini(response);
+      const query = normalizeLookQuery(raw);
+      if (query) {
+        return query;
+      }
+      if (raw) {
+        console.warn("pexels suggest unused", raw);
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError) {
+    console.warn(
+      "pexels suggest failed",
+      lastError instanceof Error ? lastError.message : lastError,
+    );
+  }
+  return null;
 }
 
 export async function suggestLookQuery(
@@ -241,7 +275,11 @@ export async function suggestLookQuery(
         setTimeout(() => resolve(null), VISION_MS);
       }),
     ]);
-  } catch {
+  } catch (error) {
+    console.warn(
+      "pexels suggest failed",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -258,19 +296,28 @@ export async function searchLooks(input: {
   }
 
   let suggested = false;
-  let query = input.query ? normalizeLookQuery(input.query) : null;
-
-  if (!query && input.baseId) {
+  let query: string | null = null;
+  if (input.query) {
+    query = normalizeLookQuery(input.query);
+  } else if (input.baseId) {
     query = await suggestLookQuery(input.env, input.userId, input.baseId);
     suggested = Boolean(query);
   }
 
   if (!query) {
-    return { query: input.query?.trim() ?? "", suggested: false, photos: [] };
+    return { query: "", suggested: false, photos: [] };
   }
 
-  const photos = await searchPexelsPhotos(apiKey, query);
-  return { query, suggested, photos };
+  try {
+    const photos = await searchPexelsPhotos(apiKey, query);
+    return { query, suggested, photos };
+  } catch (error) {
+    console.warn(
+      "pexels search failed",
+      error instanceof Error ? error.message : error,
+    );
+    return { query, suggested, photos: [] };
+  }
 }
 
 export class PexelsConfigError extends Error {
