@@ -1,5 +1,8 @@
 // Keep in sync with wrangler.jsonc bindings and `.dev.vars`.
-// Secret: wrangler secret put BETTER_AUTH_SECRET
+// Secrets: wrangler secret put BETTER_AUTH_SECRET
+//          wrangler secret put OPENAI_API_KEY
+//          wrangler secret put GEMINI_API_KEY
+//          wrangler secret put PEXELS_API_KEY
 declare namespace Cloudflare {
   interface Env {
     DB: D1Database;
@@ -11,6 +14,7 @@ declare namespace Cloudflare {
     OPENAI_API_KEY?: string;
     GEMINI_API_KEY?: string;
     GOOGLE_API_KEY?: string;
+    PEXELS_API_KEY?: string;
   }
 }
 

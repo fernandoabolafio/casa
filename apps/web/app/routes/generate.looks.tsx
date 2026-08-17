@@ -10,6 +10,7 @@ import {
   LibraryModal,
   UploadButton,
 } from "~/components/library-picker";
+import { PexelsLookStrip } from "~/components/pexels-look-strip";
 import { headingClass } from "~/lib/brand";
 import { LOOK_CAP, composePath, parseCompose, primaryActionClass } from "~/lib/compose";
 import { getEnv } from "~/lib/env.server";
@@ -52,12 +53,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     compose: { ...compose, lookIds: selectedLooks.map((item) => item.id) },
     selectedLooks,
     base: baseImage,
+    pexelsEnabled: Boolean(env.PEXELS_API_KEY),
   };
 }
 
 export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
-  const { images, compose, selectedLooks, base } = loaderData;
+  const { images, compose, selectedLooks, base, pexelsEnabled } = loaderData;
   const [libraryOpen, setLibraryOpen] = useState(false);
 
   function go(nextLooks: string[]) {
@@ -152,6 +154,13 @@ export default function GenerateLooks({ loaderData }: Route.ComponentProps) {
         <UploadButton label="Upload a look" onUploaded={addLook} />
         <FromLibraryButton onClick={() => setLibraryOpen(true)} />
       </div>
+      {pexelsEnabled && compose.baseId ? (
+        <PexelsLookStrip
+          baseId={compose.baseId}
+          lookIds={compose.lookIds}
+          onPick={addLook}
+        />
+      ) : null}
       <LibraryModal
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
